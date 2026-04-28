@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIC29302 Voltage Calculator</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; display: flex; justify-content: center; padding: 20px; background-color: #f4f4f9; }
+        .card { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
+        h2 { margin-top: 0; color: #333; font-size: 1.2rem; }
+        .input-group { margin-bottom: 1.5rem; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: bold; font-size: 0.9rem; color: #555; }
+        input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-size: 1rem; }
+        .result { background: #e7f3ff; padding: 15px; border-radius: 4px; text-align: center; border: 1px solid #b3d7ff; }
+        .result-val { font-size: 1.5rem; font-weight: bold; color: #0056b3; }
+        .formula { font-size: 0.8rem; color: #777; margin-top: 1rem; text-align: center; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>MIC29302 Calculator</h2>
+    
+    <div class="input-group">
+        <label for="r1">Resistor R1 (Ohms)</label>
+        <input type="number" id="r1" placeholder="e.g. 18700" oninput="calculateVoltage()">
+    </div>
+
+    <div class="input-group">
+        <label for="r2">Resistor R2 (Ohms)</label>
+        <input type="number" id="r2" value="10000" oninput="calculateVoltage()">
+    </div>
+
+    <div class="result">
+        <label>Output Voltage (V<sub>OUT</sub>)</label>
+        <div class="result-val" id="vout">-- V</div>
+    </div>
+
+    <p class="formula">
+        Formula: V<sub>OUT</sub> = 1.240 &times; (1 + R1/R2)
+    </p>
+    
+    <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+
+    <h2>Find R1 for Target Voltage</h2>
+    <div class="input-group">
+        <label for="targetV">Target Voltage (V)</label>
+        <input type="number" id="targetV" step="0.01" placeholder="e.g. 3.55" oninput="calculateR1()">
+    </div>
+    <div class="result">
+        <label>Required R1 (Ohms)</label>
+        <div class="result-val" id="requiredR1">-- &Omega;</div>
+    </div>
+</div>
+
+<script>
+    const VREF = 1.240;
+
+    function calculateVoltage() {
+        const r1 = parseFloat(document.getElementById('r1').value);
+        const r2 = parseFloat(document.getElementById('r2').value);
+        const display = document.getElementById('vout');
+
+        if (r1 > 0 && r2 > 0) {
+            const vout = VREF * (1 + (r1 / r2));
+            display.innerText = vout.toFixed(3) + " V";
+        } else {
+            display.innerText = "-- V";
+        }
+    }
+
+    function calculateR1() {
+        const vtarget = parseFloat(document.getElementById('targetV').value);
+        const r2 = parseFloat(document.getElementById('r2').value);
+        const display = document.getElementById('requiredR1');
+
+        if (vtarget > VREF && r2 > 0) {
+            const r1 = r2 * ((vtarget / VREF) - 1);
+            display.innerText = Math.round(r1).toLocaleString() + " Ω";
+        } else {
+            display.innerText = "-- Ω";
+        }
+    }
+</script>
+
+</body>
+</html>
