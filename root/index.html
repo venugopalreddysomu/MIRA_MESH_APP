@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>MIRA MESH — Root Node Manager</title>
+<style>
+:root {
+  --bg:        #0a0e1a;
+  --surface:   #111827;
+  --card:      #1a2035;
+  --border:    #2a3550;
+  --border-h:  #3a4a70;
+  --accent:    #10b981;
+  --accent-h:  #059669;
+  --accent-dim:#064e3b;
+  --blue:      #3b82f6;
+  --blue-dim:  #1e3a8a;
+  --danger:    #ef4444;
+  --warn:      #f59e0b;
+  --ok:        #10b981;
+  --text:      #e2e8f0;
+  --text-dim:  #94a3b8;
+  --text-mute: #4b5675;
+  --input-bg:  #0f1624;
+  --mono:      'Consolas','Fira Code',monospace;
+  --r:         8px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; }
+body { background: var(--bg); color: var(--text); font-family: system-ui,'Segoe UI',sans-serif;
+       font-size: 14px; display: flex; flex-direction: column; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2a3550; border-radius: 3px; }
+
+/* ── Header ── */
+header { background: var(--surface); border-bottom: 1px solid var(--border);
+         padding: 10px 14px; display: flex; align-items: center; gap: 10px;
+         flex-shrink: 0; min-height: 54px; }
+.logo { display: flex; flex-direction: column; }
+.logo-title { font-size: 15px; font-weight: 700; letter-spacing: .3px;
+              color: var(--accent); }
+.logo-sub   { font-size: 10px; color: var(--text-mute); letter-spacing: .5px;
+              text-transform: uppercase; }
+.badge { padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600;
+         background: #1c2540; color: var(--text-mute); transition: .3s; white-space: nowrap; }
+.badge.connected { background: var(--accent-dim); color: var(--accent); }
+.badge.busy      { background: #3b2a06; color: var(--warn); }
+.hdr-right { margin-left: auto; display: flex; gap: 7px; align-items: center; }
+.device-lbl { font-size: 12px; color: var(--text-dim); max-width: 100px;
+              overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Tab bar ── */
+nav { background: var(--surface); border-bottom: 1px solid var(--border);
+      display: flex; overflow-x: auto; flex-shrink: 0; }
+nav::-webkit-scrollbar { height: 0; }
+.tab { padding: 10px 14px; background: none; border: none; color: var(--text-dim);
+       cursor: pointer; font-size: 12px; font-weight: 500; white-space: nowrap;
+       border-bottom: 2px solid transparent; transition: .15s; position: relative; }
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab .dot { position: absolute; top: 7px; right: 7px; width: 6px; height: 6px;
+            border-radius: 50%; background: var(--warn); display: none; }
+.tab .dot.show { display: block; }
+
+/* ── Body ── */
+.body { flex: 1; overflow-y: auto; padding: 12px; }
+.pane { display: none; }
+.pane.active { display: block; }
+
+/* ── Cards ── */
+.card { background: var(--card); border: 1px solid var(--border); border-radius: var(--r);
+        padding: 14px; margin-bottom: 12px; }
+.card-title { font-size: 11px; font-weight: 600; color: var(--text-mute);
+              text-transform: uppercase; letter-spacing: .8px; margin-bottom: 12px; }
+
+/* ── Stat boxes ── */
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+             gap: 8px; }
+.stat { background: var(--input-bg); border: 1px solid var(--border); border-radius: 6px;
+        padding: 10px 12px; }
+.stat .s-lbl { font-size: 10px; color: var(--text-mute); text-transform: uppercase;
+               letter-spacing: .6px; }
+.stat .s-val { font-size: 20px; font-weight: 700; font-family: var(--mono);
+               color: var(--text); margin: 3px 0 1px; }
+.stat .s-sub { font-size: 11px; color: var(--text-dim); }
+.stat.ok-stat  { border-color: var(--accent-dim); }
+.stat.err-stat { border-color: #7f1d1d; }
+.stat.warn-stat { border-color: #78350f; }
+
+/* ── Buttons ── */
+.btn { padding: 7px 14px; border-radius: 6px; border: none; cursor: pointer;
+       font-size: 13px; font-weight: 500; transition: .15s; white-space: nowrap;
+       display: inline-flex; align-items: center; gap: 5px; }
+.btn:disabled { opacity: .35; cursor: not-allowed; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:not(:disabled):hover { background: var(--accent-h); }
+.btn-blue    { background: var(--blue); color: #fff; }
+.btn-blue:not(:disabled):hover { background: #2563eb; }
+.btn-danger  { background: var(--danger); color: #fff; }
+.btn-danger:not(:disabled):hover { background: #dc2626; }
+.btn-warn    { background: var(--warn); color: #000; }
+.btn-warn:not(:disabled):hover { background: #d97706; }
+.btn-ghost   { background: var(--input-bg); color: var(--text-dim);
+               border: 1px solid var(--border); }
+.btn-ghost:not(:disabled):hover { color: var(--text); border-color: var(--border-h); }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.btn-row { display: flex; gap: 7px; margin-top: 12px; flex-wrap: wrap; }
+
+/* ── Forms ── */
+.field-row { display: grid; grid-template-columns: 160px 1fr auto;
+             gap: 7px 10px; align-items: center; margin-bottom: 4px; }
+@media (max-width: 520px) { .field-row { grid-template-columns: 1fr; } }
+.field-row label { color: var(--text-dim); font-size: 13px; }
+.unit { font-size: 11px; color: var(--text-mute); }
+input, select {
+  background: var(--input-bg); border: 1px solid var(--border);
+  color: var(--text); border-radius: 6px; padding: 7px 10px;
+  font-size: 13px; width: 100%; font-family: inherit; transition: border .15s;
+}
+input:focus, select:focus { outline: none; border-color: var(--accent); }
+input[readonly] { color: var(--text-dim); cursor: default; }
+select { cursor: pointer; }
+
+/* ── Quick Action Bar ── */
+.quick-bar { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 12px; }
+.qa { padding: 10px 14px; border-radius: 8px; border: none; cursor: pointer;
+      font-size: 13px; font-weight: 600; transition: .15s; flex: 1;
+      min-width: 110px; text-align: center; }
+.qa:disabled { opacity: .3; cursor: not-allowed; }
+.qa-poll   { background: var(--accent); color: #fff; }
+.qa-poll:not(:disabled):hover { background: var(--accent-h); }
+.qa-send   { background: #1d4ed8; color: #fff; }
+.qa-send:not(:disabled):hover { background: #1e40af; }
+.qa-data   { background: #374151; color: var(--text); }
+.qa-data:not(:disabled):hover { background: #4b5563; }
+.qa-flood  { background: #7c3aed; color: #fff; }
+.qa-flood:not(:disabled):hover { background: #6d28d9; }
+
+/* ── Cycle data table ── */
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; padding: 7px 10px; color: var(--text-mute); font-size: 11px;
+     text-transform: uppercase; letter-spacing: .6px; border-bottom: 1px solid var(--border);
+     font-weight: 600; }
+td { padding: 7px 10px; border-bottom: 1px solid #141a2e; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(16,185,129,.04); }
+.pill { padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.pill-auto    { background: #064e3b; color: #6ee7b7; }
+.pill-queried { background: #1e3a8a; color: #93c5fd; }
+.pill-miss    { background: #7f1d1d; color: #fca5a5; }
+.pill-ok      { background: #064e3b; color: #6ee7b7; }
+
+/* ── Floor Map Grid ── */
+.floor-grid { display: grid; grid-template-columns: repeat(8, 1fr);
+              gap: 5px; margin-bottom: 10px; }
+@media (max-width: 480px) { .floor-grid { grid-template-columns: repeat(5, 1fr); } }
+.fbox { aspect-ratio: 1; border-radius: 6px; border: 1px solid var(--border);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 11px; font-weight: 600; cursor: pointer; transition: .15s;
+        color: var(--text-mute); background: var(--input-bg); user-select: none; }
+.fbox:hover   { border-color: var(--accent); color: var(--accent); }
+.fbox.reg     { background: var(--accent-dim); border-color: var(--accent);
+                color: var(--accent); }
+.fbox.recv    { background: #064e3b; border-color: #059669; color: #6ee7b7; }
+.fbox.miss    { background: #7f1d1d; border-color: #dc2626; color: #fca5a5; }
+
+/* ── Terminal log ── */
+.log-box { background: #060a12; border: 1px solid var(--border); border-radius: 6px;
+           padding: 10px 12px; height: 240px; overflow-y: auto;
+           font-family: var(--mono); font-size: 12px; line-height: 1.65; }
+.l-tx   { color: #60a5fa; }
+.l-rx   { color: #6ee7b7; }
+.l-err  { color: #f87171; }
+.l-info { color: #6b7280; }
+.l-data { color: #a78bfa; }
+.term-row { display: flex; gap: 8px; margin-top: 8px; }
+.term-row input { flex: 1; font-family: var(--mono); }
+
+/* ── Cloud status ── */
+.cloud-box { padding: 10px 12px; border-radius: 6px; font-size: 12px;
+             font-family: var(--mono); background: var(--input-bg);
+             border: 1px solid var(--border); color: var(--text-dim);
+             min-height: 48px; word-break: break-all; }
+
+/* ── Info box ── */
+.info-box { background: #0f2027; border: 1px solid #1e4a3a; border-radius: 6px;
+            padding: 10px 14px; font-size: 12px; color: #86efac; margin-bottom: 10px; }
+.warn-box { background: #1c1000; border: 1px solid #78350f; border-radius: 6px;
+            padding: 10px 14px; font-size: 12px; color: var(--warn); margin-bottom: 10px; }
+
+/* ── Divider ── */
+hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+
+/* ── Connection overlay ── */
+.lock-msg { text-align: center; padding: 30px 16px; color: var(--text-mute); }
+.lock-msg .lock-icon { font-size: 40px; margin-bottom: 10px; }
+
+/* ── Progress bar ── */
+.progress-wrap { background: var(--input-bg); border-radius: 4px;
+                 height: 6px; overflow: hidden; margin-top: 8px; }
+.progress-bar { height: 100%; border-radius: 4px; background: var(--accent);
+                transition: width .4s; width: 0%; }
+
+/* ── Quick cmds ── */
+.qcmds { margin-top: 8px; font-size: 12px; color: var(--text-mute); }
+.qcmds a { color: var(--accent); cursor: pointer; text-decoration: none; }
+.qcmds a:hover { text-decoration: underline; }
+
+/* ── Two-column layout for larger screens ── */
+@media (min-width: 720px) {
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .two-col .card { margin-bottom: 0; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ─────────────────────────────────────────────────────────────── -->
+<header>
+  <div class="logo">
+    <div class="logo-title">MIRA MESH</div>
+    <div class="logo-sub">Root Node Manager</div>
+  </div>
+  <span class="badge" id="conn-badge">Disconnected</span>
+  <span class="badge busy" id="busy-badge" style="display:none">CYCLE ACTIVE</span>
+  <div class="hdr-right">
+    <span class="device-lbl" id="hdr-dev"></span>
+    <button class="btn btn-primary" id="btn-connect">Connect</button>
+    <button class="btn btn-ghost"   id="btn-disconnect" style="display:none">Disconnect</button>
+  </div>
+</header>
+
+<!-- ── TABS ──────────────────────────────────────────────────────────────── -->
+<nav>
+  <button class="tab active" data-tab="dashboard">Dashboard</button>
+  <button class="tab" data-tab="cycle">
+    Cycle Data<span class="dot" id="dot-cycle"></span>
+  </button>
+  <button class="tab" data-tab="floors">Floor Map</button>
+  <button class="tab" data-tab="cloud">Cloud</button>
+  <button class="tab" data-tab="settings">Settings</button>
+  <button class="tab" data-tab="terminal">Terminal</button>
+</nav>
+
+<!-- ── BODY ──────────────────────────────────────────────────────────────── -->
+<div class="body">
+
+<!-- ══ DASHBOARD ══════════════════════════════════════════════════════════ -->
+<div class="pane active" id="pane-dashboard">
+
+  <!-- Quick actions -->
+  <div class="quick-bar" style="margin-bottom:12px">
+    <button class="qa qa-poll"  id="qa-poll"  disabled title="Collect all floors now">&#9654; Poll Now</button>
+    <button class="qa qa-send"  id="qa-send"  disabled title="Collect then upload to cloud">&#8679; Poll &amp; Send</button>
+    <button class="qa qa-data"  id="qa-data"  disabled title="Show last cycle readings">&#9783; Last Data</button>
+    <button class="qa qa-flood" id="qa-flood" disabled title="Broadcast a test DATA packet">&#8764; Test Flood</button>
+  </div>
+
+  <!-- Node info -->
+  <div class="card">
+    <div class="card-title">Node Status</div>
+    <div class="stat-grid">
+      <div class="stat">
+        <div class="s-lbl">Group ID</div>
+        <div class="s-val" id="d-group">—</div>
+        <div class="s-sub">Mesh group</div>
+      </div>
+      <div class="stat">
+        <div class="s-lbl">Interval</div>
+        <div class="s-val" id="d-interval">—</div>
+        <div class="s-sub">Send cycle</div>
+      </div>
+      <div class="stat">
+        <div class="s-lbl">PHY Mode</div>
+        <div class="s-val" id="d-phy" style="font-size:14px;padding-top:4px">—</div>
+        <div class="s-sub">BLE radio</div>
+      </div>
+      <div class="stat">
+        <div class="s-lbl">Cust Code</div>
+        <div class="s-val" id="d-cust" style="font-size:14px;padding-top:4px">—</div>
+        <div class="s-sub">BLE name prefix</div>
+      </div>
+      <div class="stat">
+        <div class="s-lbl">Registered Floors</div>
+        <div class="s-val" id="d-floor-count">—</div>
+        <div class="s-sub">in mesh group</div>
+      </div>
+      <div class="stat">
+        <div class="s-lbl">RTC Time</div>
+        <div class="s-val" style="font-size:12px;padding-top:6px;font-family:var(--mono)" id="d-time">—</div>
+        <div class="s-sub">UTC</div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-ghost btn-sm" id="d-btn-status" disabled>Refresh Status</button>
+      <button class="btn btn-ghost btn-sm" id="d-btn-time"   disabled>Get RTC</button>
+      <button class="btn btn-ghost btn-sm" id="d-btn-reset"  disabled>Get Reset Cause</button>
+    </div>
+    <div style="margin-top:8px;font-size:12px;color:var(--text-mute)">Reset: <span id="d-reset-cause">—</span></div>
+  </div>
+
+  <!-- Last cycle summary -->
+  <div class="card">
+    <div class="card-title">Last Cycle Summary</div>
+    <div class="stat-grid">
+      <div class="stat ok-stat">
+        <div class="s-lbl">Received</div>
+        <div class="s-val" id="d-recv">—</div>
+        <div class="s-sub">floors collected</div>
+      </div>
+      <div class="stat err-stat">
+        <div class="s-lbl">Missed</div>
+        <div class="s-val" id="d-miss">—</div>
+        <div class="s-sub">floors missed</div>
+      </div>
+      <div class="stat">
+        <div class="s-lbl">Auto Broadcast</div>
+        <div class="s-val" id="d-auto">—</div>
+        <div class="s-sub">floors autonomous</div>
+      </div>
+      <div class="stat">
+        <div class="s-lbl">Queried</div>
+        <div class="s-val" id="d-queried">—</div>
+        <div class="s-sub">floors polled</div>
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      <div class="progress-wrap"><div class="progress-bar" id="d-prog"></div></div>
+      <div style="font-size:11px;color:var(--text-mute);margin-top:4px" id="d-prog-lbl"></div>
+    </div>
+  </div>
+
+  <!-- Cloud summary -->
+  <div class="card">
+    <div class="card-title">Cloud Connection</div>
+    <div class="cloud-box" id="d-cloud-box">Not checked — tap Cloud tab or CLOUD_STATUS</div>
+    <div class="btn-row">
+      <button class="btn btn-ghost btn-sm" id="d-btn-cloud" disabled>CLOUD_STATUS</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CYCLE DATA ══════════════════════════════════════════════════════════ -->
+<div class="pane" id="pane-cycle">
+  <div class="card">
+    <div class="card-title">Floor Readings — Last Cycle</div>
+    <div class="tbl-wrap">
+      <table id="cycle-table">
+        <thead><tr>
+          <th>Floor</th>
+          <th>Volume (L)</th>
+          <th>Flow (L/min)</th>
+          <th>Hops</th>
+          <th>Method</th>
+          <th>Status</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="cycle-tbody">
+          <tr><td colspan="7" style="text-align:center;color:var(--text-mute);padding:20px">
+            No data — connect and run Poll Now</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-ghost btn-sm" id="cy-refresh" disabled>Refresh</button>
+      <button class="btn btn-ghost btn-sm" id="cy-export">Export CSV</button>
+    </div>
+  </div>
+
+  <!-- Single floor poll -->
+  <div class="card">
+    <div class="card-title">Single Floor Query</div>
+    <div class="field-row">
+      <label>Floor ID</label>
+      <input type="number" id="cy-poll-id" min="1" max="40" placeholder="1–40">
+      <span class="unit"></span>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-blue btn-sm" id="cy-poll-btn" disabled>Poll Floor</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ FLOOR MAP ═══════════════════════════════════════════════════════════ -->
+<div class="pane" id="pane-floors">
+
+  <div class="info-box">
+    Tap a floor to toggle registered. Green = registered. Bright green = received last cycle. Red = missed last cycle.
+  </div>
+
+  <div class="card">
+    <div class="card-title">Floor Grid (1–40)</div>
+    <div class="floor-grid" id="floor-grid"></div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:11px;color:var(--text-mute)">
+      <span style="display:flex;align-items:center;gap:4px">
+        <span style="width:12px;height:12px;border-radius:3px;background:var(--input-bg);border:1px solid var(--border);display:inline-block"></span> Unregistered</span>
+      <span style="display:flex;align-items:center;gap:4px">
+        <span style="width:12px;height:12px;border-radius:3px;background:var(--accent-dim);border:1px solid var(--accent);display:inline-block"></span> Registered</span>
+      <span style="display:flex;align-items:center;gap:4px">
+        <span style="width:12px;height:12px;border-radius:3px;background:#064e3b;border:1px solid #059669;display:inline-block"></span> Received</span>
+      <span style="display:flex;align-items:center;gap:4px">
+        <span style="width:12px;height:12px;border-radius:3px;background:#7f1d1d;border:1px solid #dc2626;display:inline-block"></span> Missed</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Floor Management</div>
+    <div class="field-row">
+      <label>Floor ID</label>
+      <input type="number" id="fm-id" min="1" max="40" placeholder="1–40">
+      <span class="unit"></span>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary btn-sm" id="fm-add"    disabled>Add Floor</button>
+      <button class="btn btn-danger  btn-sm" id="fm-remove" disabled>Remove Floor</button>
+      <button class="btn btn-ghost   btn-sm" id="fm-list"   disabled>List Floors</button>
+      <button class="btn btn-warn    btn-sm" id="fm-clear"  disabled>Clear All</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CLOUD ═══════════════════════════════════════════════════════════════ -->
+<div class="pane" id="pane-cloud">
+  <div class="card">
+    <div class="card-title">Cloud Status</div>
+    <div class="cloud-box" id="cloud-status-box">Tap Refresh to check</div>
+    <div class="btn-row">
+      <button class="btn btn-primary btn-sm" id="cl-status" disabled>Refresh Status</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Cellular APN</div>
+    <div class="field-row">
+      <label>APN</label>
+      <input type="text" id="cl-apn" placeholder="e.g. airtelgprs.com">
+      <span class="unit"></span>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-ghost   btn-sm" id="cl-get-apn" disabled>Get APN</button>
+      <button class="btn btn-primary btn-sm" id="cl-set-apn" disabled>Set APN</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Manual Upload</div>
+    <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;line-height:1.6">
+      <strong>Poll &amp; Send</strong> collects all registered floors and uploads to ThingsBoard.
+      SPP stays connected so you can see upload progress in real time.
+    </p>
+    <div class="btn-row">
+      <button class="btn btn-blue" id="cl-poll-send" disabled>Poll &amp; Send Now</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SETTINGS ════════════════════════════════════════════════════════════ -->
+<div class="pane" id="pane-settings">
+  <div class="two-col">
+
+  <div class="card">
+    <div class="card-title">Network Settings</div>
+    <div class="field-row">
+      <label>Group ID</label>
+      <input type="number" id="s-group" min="1" max="255" placeholder="1–255">
+      <span class="unit"></span>
+    </div>
+    <div class="field-row">
+      <label>Send Interval</label>
+      <select id="s-interval">
+        <option value="60">1 min</option>
+        <option value="300">5 min</option>
+        <option value="600">10 min</option>
+        <option value="900" selected>15 min</option>
+        <option value="1200">20 min</option>
+        <option value="1800">30 min</option>
+        <option value="3600">1 hr</option>
+        <option value="14400">4 hr</option>
+        <option value="28800">8 hr</option>
+        <option value="43200">12 hr</option>
+        <option value="86400">24 hr</option>
+      </select>
+      <span class="unit"></span>
+    </div>
+    <div class="field-row">
+      <label>PHY Mode</label>
+      <select id="s-phy">
+        <option value="LEGACY">Legacy (1M)</option>
+        <option value="CODED">Coded (Long Range)</option>
+      </select>
+      <span class="unit"></span>
+    </div>
+    <div class="warn-box" style="margin-top:10px">
+      &#9888; Group ID and PHY changes require a device reboot.
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary btn-sm" id="s-set-group"    disabled>Set Group</button>
+      <button class="btn btn-primary btn-sm" id="s-set-interval" disabled>Set Interval</button>
+      <button class="btn btn-primary btn-sm" id="s-set-phy"      disabled>Set PHY</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Device Identity</div>
+    <div class="field-row">
+      <label>Customer Code</label>
+      <input type="text" id="s-cust-code" maxlength="2" placeholder="1–2 chars, e.g. EF">
+      <span class="unit"></span>
+    </div>
+    <p style="font-size:12px;color:var(--text-mute);margin-top:6px">
+      BLE device name: <span id="s-name-preview" style="color:var(--text-dim)">RT_??001</span>
+    </p>
+    <div class="btn-row">
+      <button class="btn btn-ghost   btn-sm" id="s-get-cust" disabled>Get Code</button>
+      <button class="btn btn-primary btn-sm" id="s-set-cust" disabled>Set Code</button>
+    </div>
+  </div>
+
+  </div><!-- end two-col -->
+
+  <div class="two-col">
+
+  <div class="card">
+    <div class="card-title">RTC / Time</div>
+    <div class="field-row">
+      <label>Current Time</label>
+      <input type="text" id="s-rtc" readonly placeholder="Click Get RTC">
+      <span class="unit"></span>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-ghost   btn-sm" id="s-get-time" disabled>Get RTC</button>
+      <button class="btn btn-primary btn-sm" id="s-set-time" disabled>Set Time (Now)</button>
+    </div>
+    <p style="font-size:12px;color:var(--text-mute);margin-top:8px">
+      Setting time also broadcasts TIME_SYNC to all floor nodes.
+    </p>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Device Control</div>
+    <div class="field-row">
+      <label>Reset Cause</label>
+      <input type="text" id="s-reset-cause" readonly placeholder="—">
+      <span class="unit"></span>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-ghost  btn-sm" id="s-get-reset" disabled>Get Reset Cause</button>
+      <button class="btn btn-danger btn-sm" id="s-reboot"    disabled>Reboot Device</button>
+    </div>
+  </div>
+
+  </div><!-- end two-col -->
+</div>
+
+<!-- ══ TERMINAL ════════════════════════════════════════════════════════════ -->
+<div class="pane" id="pane-terminal">
+  <div class="card">
+    <div class="card-title">Raw SPP Terminal</div>
+    <div class="log-box" id="log-box"></div>
+    <div class="term-row">
+      <input type="text" id="term-in" placeholder="Type SPP command and press Enter" disabled>
+      <button class="btn btn-primary btn-sm" id="term-send" disabled>Send</button>
+      <button class="btn btn-ghost   btn-sm" id="term-clear">Clear</button>
+    </div>
+    <div class="qcmds">
+      Quick:
+      <a class="qc">STATUS</a> &nbsp;
+      <a class="qc">LIST_FLOORS</a> &nbsp;
+      <a class="qc">GET_DATA</a> &nbsp;
+      <a class="qc">CLOUD_STATUS</a> &nbsp;
+      <a class="qc">GET_TIME</a> &nbsp;
+      <a class="qc">GET_APN</a> &nbsp;
+      <a class="qc">GET_RESET_CAUSE</a>
+    </div>
+  </div>
+</div>
+
+</div><!-- end .body -->
+
+<script>
+/* ════════════════════════════════════════════════════════════════════════════
+ * MIRA MESH Root Node Manager — BLE Web Bluetooth SPP client
+ *
+ * BLE SPP Service  : 4880c12c-fdcb-4077-8920-a450d7f9b907
+ * SPP Data Char    : fec26ec4-6d71-4442-9f81-55bc21d658d6
+ *   Write (no rsp) : send ASCII command + \n
+ *   Notify         : receive ASCII response lines
+ *
+ * Response formats (from ROOT/app.c):
+ *   STATUS → "ROOT GROUP=<n> INTERVAL=<s> PHY=<CODED|LEGACY> FLOORS=?"
+ *            then: "FLOORS count=<n>:" + "  [n] FLOOR=<id>" per floor
+ *   GET_DATA → "DATA floor=<id> vol=<v> L flow=<f> L/min hops=<h> method=<AUTO|QUERIED>"
+ *              or "MISS floor=<id>" then "END_DATA"
+ *   LIST_FLOORS → "FLOORS count=<n>:" + "  [n] FLOOR=<id>"
+ *   ADD_FLOOR   → "OK ADD FLOOR=<id> count=<n>"
+ *   REMOVE_FLOOR→ "OK REMOVE FLOOR=<id> count=<n>"
+ *   CLOUD_STATUS→ "CLOUD <status_string>"
+ *   APN         → "APN=<apn>"
+ *   CUST_CODE   → "CUST_CODE=<code>"
+ *   RESET_CAUSE → "RESET_CAUSE=<str> (raw=0x...)"
+ *   TIME        → "TIME unix=<ts> ..." or "OK TIME=<ts> ..."
+ * ════════════════════════════════════════════════════════════════════════════ */
+
+const SPP_SVC  = '4880c12c-fdcb-4077-8920-a450d7f9b907';
+const SPP_CHAR = 'fec26ec4-6d71-4442-9f81-55bc21d658d6';
+
+/* ── State ── */
+let bleDevice = null, bleServer = null, sppChar = null;
+let connected = false;
+let rxBuf = '';
+let resolvers = [];
+
+/* App state */
+let registeredFloors = new Set();   /* floor IDs currently registered on device */
+let cycleData = {};                 /* floor_id → {vol, flow, hops, method, miss} */
+let lastCycleEnd = false;
+let cycleActive = false;
+
+/* ── Logging ── */
+const logBox = document.getElementById('log-box');
+function log(msg, cls = 'l-info') {
+  const ts  = new Date().toLocaleTimeString('en-GB', { hour12: false });
+  const div = document.createElement('div');
+  div.className = cls;
+  div.textContent = `[${ts}] ${msg}`;
+  logBox.appendChild(div);
+  if (logBox.children.length > 500) logBox.removeChild(logBox.firstChild);
+  logBox.scrollTop = logBox.scrollHeight;
+}
+
+/* ── BLE Connect ── */
+document.getElementById('btn-connect').addEventListener('click', async () => {
+  if (!navigator.bluetooth) {
+    alert('Web Bluetooth not supported.\nUse Chrome or Edge on desktop/Android.');
+    return;
+  }
+  try {
+    log('Scanning for MIRA MESH Root Node…');
+    bleDevice = await navigator.bluetooth.requestDevice({
+      filters: [{ services: [SPP_SVC] }],
+      optionalServices: [SPP_SVC]
+    });
+    bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+    bleServer = await bleDevice.gatt.connect();
+    const svc = await bleServer.getPrimaryService(SPP_SVC);
+    sppChar   = await svc.getCharacteristic(SPP_CHAR);
+    await sppChar.startNotifications();
+    sppChar.addEventListener('characteristicvaluechanged', onNotify);
+    onConnected();
+  } catch (e) {
+    log('Connect error: ' + e.message, 'l-err');
+  }
+});
+
+document.getElementById('btn-disconnect').addEventListener('click', () => {
+  if (bleDevice?.gatt.connected) bleDevice.gatt.disconnect();
+});
+
+function onConnected() {
+  connected = true;
+  const name = bleDevice.name || 'ROOT NODE';
+  document.getElementById('conn-badge').textContent = 'Connected: ' + name;
+  document.getElementById('conn-badge').classList.add('connected');
+  document.getElementById('hdr-dev').textContent = '';
+  document.getElementById('btn-connect').style.display = 'none';
+  document.getElementById('btn-disconnect').style.display = '';
+  log('Connected to ' + name, 'l-info');
+  enableAll(true);
+  /* Auto-load status and floor list */
+  setTimeout(() => { send('STATUS'); send('LIST_FLOORS'); send('GET_TIME'); send('GET_CUST_CODE'); }, 300);
+}
+
+function onDisconnected() {
+  connected = false;
+  cycleActive = false;
+  document.getElementById('conn-badge').textContent = 'Disconnected';
+  document.getElementById('conn-badge').classList.remove('connected');
+  document.getElementById('busy-badge').style.display = 'none';
+  document.getElementById('btn-connect').style.display = '';
+  document.getElementById('btn-disconnect').style.display = 'none';
+  document.getElementById('hdr-dev').textContent = '';
+  enableAll(false);
+  sppChar = null;
+  resolvers.forEach(r => r.reject(new Error('disconnected')));
+  resolvers = [];
+  log('Disconnected', 'l-info');
+}
+
+/* ── BLE Receive ── */
+function onNotify(event) {
+  const raw = new TextDecoder().decode(event.target.value);
+  rxBuf += raw;
+  const lines = rxBuf.split(/\r?\n/);
+  rxBuf = lines.pop();
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t) continue;
+    log('← ' + t, 'l-rx');
+    dispatch(t);
+    if (resolvers.length) resolvers.shift().resolve(t);
+  }
+}
+
+/* ── Parser / Dispatcher ── */
+function dispatch(line) {
+
+  /* STATUS: ROOT GROUP=1 INTERVAL=900 PHY=CODED */
+  const mStatus = line.match(/^ROOT\s+GROUP=(\d+)\s+INTERVAL=(\d+)\s+PHY=(\S+)/);
+  if (mStatus) {
+    const g = mStatus[1], iv = mStatus[2], phy = mStatus[3];
+    document.getElementById('d-group').textContent    = g;
+    document.getElementById('d-interval').textContent = fmtInterval(+iv);
+    document.getElementById('d-phy').textContent      = phy;
+    document.getElementById('s-group').value     = g;
+    document.getElementById('s-interval').value  = iv;
+    document.getElementById('s-phy').value       = phy;
+    updateNamePreview();
+    return;
+  }
+
+  /* FLOORS count=n: */
+  const mFloorCount = line.match(/^FLOORS\s+count=(\d+)/);
+  if (mFloorCount) {
+    const n = +mFloorCount[1];
+    document.getElementById('d-floor-count').textContent = n;
+    registeredFloors.clear();
+    return;
+  }
+
+  /* FLOORS: (none registered) */
+  if (line.includes('(none registered)')) {
+    registeredFloors.clear();
+    document.getElementById('d-floor-count').textContent = '0';
+    refreshFloorGrid();
+    return;
+  }
+
+  /*   [n] FLOOR=id */
+  const mFloorEntry = line.match(/\[\d+\]\s+FLOOR=(\d+)/);
+  if (mFloorEntry) {
+    registeredFloors.add(+mFloorEntry[1]);
+    document.getElementById('d-floor-count').textContent = registeredFloors.size;
+    refreshFloorGrid();
+    return;
+  }
+
+  /* OK ADD FLOOR=id count=n */
+  const mAdd = line.match(/^OK ADD FLOOR=(\d+) count=(\d+)/);
+  if (mAdd) {
+    registeredFloors.add(+mAdd[1]);
+    document.getElementById('d-floor-count').textContent = registeredFloors.size;
+    refreshFloorGrid();
+    return;
+  }
+
+  /* OK REMOVE FLOOR=id */
+  const mRem = line.match(/^OK REMOVE FLOOR=(\d+)/);
+  if (mRem) {
+    registeredFloors.delete(+mRem[1]);
+    document.getElementById('d-floor-count').textContent = registeredFloors.size;
+    refreshFloorGrid();
+    return;
+  }
+
+  /* OK FLOORS cleared */
+  if (line === 'OK FLOORS cleared') {
+    registeredFloors.clear();
+    document.getElementById('d-floor-count').textContent = '0';
+    refreshFloorGrid();
+    return;
+  }
+
+  /* DATA floor=n vol=xx.yy L flow=a.bbb L/min hops=n method=AUTO|QUERIED */
+  const mData = line.match(/^DATA\s+floor=(\d+)\s+vol=(\S+)\s+L\s+flow=(\S+)\s+L\/min\s+hops=(\d+)\s+method=(\S+)/);
+  if (mData) {
+    const id = +mData[1];
+    cycleData[id] = {
+      vol: mData[2], flow: mData[3],
+      hops: +mData[4], method: mData[5], miss: false
+    };
+    document.getElementById('dot-cycle').classList.add('show');
+    return;
+  }
+
+  /* MISS floor=n */
+  const mMiss = line.match(/^MISS\s+floor=(\d+)/);
+  if (mMiss) {
+    cycleData[+mMiss[1]] = { miss: true };
+    document.getElementById('dot-cycle').classList.add('show');
+    return;
+  }
+
+  /* END_DATA */
+  if (line === 'END_DATA') {
+    renderCycleTable();
+    updateDashboardCycle();
+    refreshFloorGrid();
+    lastCycleEnd = true;
+    cycleActive = false;
+    document.getElementById('busy-badge').style.display = 'none';
+    return;
+  }
+
+  /* TIME */
+  const mTime = line.match(/(?:TIME unix=|OK TIME=)(\d+)/);
+  if (mTime) {
+    const ts = +mTime[1];
+    const s = new Date(ts * 1000).toISOString().replace('T', ' ').slice(0, 19);
+    document.getElementById('d-time').textContent = s + ' UTC';
+    document.getElementById('s-rtc').value = s + ' UTC';
+    return;
+  }
+
+  /* CUST_CODE=xx */
+  const mCust = line.match(/^CUST_CODE=(\S+)/);
+  if (mCust) {
+    document.getElementById('d-cust').textContent = mCust[1];
+    document.getElementById('s-cust-code').value  = mCust[1];
+    updateNamePreview();
+    return;
+  }
+
+  /* APN=xxx */
+  const mApn = line.match(/^APN=(.+)/);
+  if (mApn) {
+    document.getElementById('cl-apn').value = mApn[1].trim();
+    return;
+  }
+
+  /* CLOUD ... */
+  const mCloud = line.match(/^CLOUD\s+(.*)/);
+  if (mCloud) {
+    const s = mCloud[1];
+    document.getElementById('cloud-status-box').textContent = s;
+    document.getElementById('d-cloud-box').textContent = s;
+    return;
+  }
+
+  /* RESET_CAUSE=... */
+  const mRst = line.match(/^RESET_CAUSE=(.+)/);
+  if (mRst) {
+    const v = mRst[1];
+    document.getElementById('d-reset-cause').textContent = v;
+    document.getElementById('s-reset-cause').value = v;
+    return;
+  }
+
+  /* OK POLL_NOW / OK POLL_AND_SEND — cycle starting */
+  if (line.startsWith('OK POLL_NOW') || line.startsWith('OK POLL_AND_SEND')) {
+    cycleActive = true;
+    cycleData = {};
+    document.getElementById('busy-badge').style.display = '';
+    document.getElementById('dot-cycle').classList.remove('show');
+    return;
+  }
+
+  /* NET_TIME — time synced from network */
+  const mNet = line.match(/^NET_TIME=(\d+)/);
+  if (mNet) {
+    const s = new Date(+mNet[1] * 1000).toISOString().replace('T', ' ').slice(0, 19);
+    document.getElementById('d-time').textContent = s + ' UTC';
+    document.getElementById('s-rtc').value = s + ' UTC';
+    return;
+  }
+}
+
+/* ── Send ── */
+async function send(cmd) {
+  if (!sppChar) return;
+  log('→ ' + cmd, 'l-tx');
+  const data  = new TextEncoder().encode(cmd + '\n');
+  const CHUNK = 20;
+  try {
+    for (let i = 0; i < data.byteLength; i += CHUNK)
+      await sppChar.writeValueWithoutResponse(data.slice(i, i + CHUNK));
+  } catch (e) {
+    log('BLE write error: ' + e.message, 'l-err');
+  }
+}
+
+/* ── Floor Grid ── */
+(function buildGrid() {
+  const g = document.getElementById('floor-grid');
+  for (let i = 1; i <= 40; i++) {
+    const d = document.createElement('div');
+    d.className = 'fbox';
+    d.textContent = i;
+    d.id = 'fb-' + i;
+    d.addEventListener('click', () => toggleFloor(i));
+    g.appendChild(d);
+  }
+})();
+
+function refreshFloorGrid() {
+  const recv = new Set(Object.entries(cycleData).filter(([,v])=>!v.miss).map(([k])=>+k));
+  const miss = new Set(Object.entries(cycleData).filter(([,v])=>v.miss).map(([k])=>+k));
+  for (let i = 1; i <= 40; i++) {
+    const el = document.getElementById('fb-' + i);
+    el.className = 'fbox';
+    if (miss.has(i))         el.classList.add('miss');
+    else if (recv.has(i))    el.classList.add('recv');
+    else if (registeredFloors.has(i)) el.classList.add('reg');
+  }
+}
+
+function toggleFloor(id) {
+  if (!connected) return;
+  if (registeredFloors.has(id)) {
+    if (!confirm(`Remove Floor ${id} from registered list?`)) return;
+    send(`REMOVE_FLOOR=${id}`);
+  } else {
+    send(`ADD_FLOOR=${id}`);
+  }
+}
+
+/* ── Cycle Table ── */
+function renderCycleTable() {
+  const tbody = document.getElementById('cycle-tbody');
+  tbody.innerHTML = '';
+  const ids = Object.keys(cycleData).map(Number).sort((a,b)=>a-b);
+  if (!ids.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-mute);padding:20px">No data</td></tr>';
+    return;
+  }
+  for (const id of ids) {
+    const r = cycleData[id];
+    const tr = document.createElement('tr');
+    if (r.miss) {
+      tr.innerHTML = `
+        <td><strong>${id}</strong></td>
+        <td>—</td><td>—</td><td>—</td>
+        <td><span class="pill pill-miss">MISSED</span></td>
+        <td><span class="pill pill-miss">No response</span></td>
+        <td><button class="btn btn-ghost btn-sm" onclick="pollOne(${id})" ${connected?'':'disabled'}>Poll</button></td>`;
+    } else {
+      const mPill = r.method === 'AUTO'
+        ? `<span class="pill pill-auto">AUTO</span>`
+        : `<span class="pill pill-queried">QUERIED</span>`;
+      tr.innerHTML = `
+        <td><strong>${id}</strong></td>
+        <td style="font-family:var(--mono)">${r.vol}</td>
+        <td style="font-family:var(--mono)">${r.flow}</td>
+        <td>${r.hops}</td>
+        <td>${mPill}</td>
+        <td><span class="pill pill-ok">OK</span></td>
+        <td><button class="btn btn-ghost btn-sm" onclick="pollOne(${id})" ${connected?'':'disabled'}>Poll</button></td>`;
+    }
+    tbody.appendChild(tr);
+  }
+}
+
+window.pollOne = function(id) {
+  if (!connected) return;
+  send('POLL ' + id);
+};
+
+/* ── Dashboard cycle summary ── */
+function updateDashboardCycle() {
+  const all = Object.values(cycleData);
+  const recv = all.filter(r => !r.miss).length;
+  const miss = all.filter(r => r.miss).length;
+  const auto = all.filter(r => !r.miss && r.method === 'AUTO').length;
+  const queried = all.filter(r => !r.miss && r.method !== 'AUTO').length;
+  document.getElementById('d-recv').textContent = recv;
+  document.getElementById('d-miss').textContent = miss;
+  document.getElementById('d-auto').textContent = auto;
+  document.getElementById('d-queried').textContent = queried;
+  const total = recv + miss;
+  const pct = total ? Math.round(recv / total * 100) : 0;
+  document.getElementById('d-prog').style.width = pct + '%';
+  document.getElementById('d-prog-lbl').textContent =
+    total ? `${recv} / ${total} floors collected (${pct}%)` : '';
+  if (miss > 0) document.getElementById('d-prog').style.background = '#f59e0b';
+  else document.getElementById('d-prog').style.background = 'var(--accent)';
+}
+
+/* ── Interval formatter ── */
+function fmtInterval(sec) {
+  if (sec < 60)   return sec + 's';
+  if (sec < 3600) return (sec / 60) + 'm';
+  return (sec / 3600) + 'h';
+}
+
+/* ── Device name preview ── */
+function updateNamePreview() {
+  const code  = document.getElementById('s-cust-code').value || '??';
+  const group = document.getElementById('s-group').value || '?';
+  document.getElementById('s-name-preview').textContent =
+    `RT_${code}${String(group).padStart(3,'0')}`;
+}
+
+/* ── Export CSV ── */
+document.getElementById('cy-export').addEventListener('click', () => {
+  let csv = 'floor_id,volume_L,flow_Lmin,hops,method,status\n';
+  const ids = Object.keys(cycleData).map(Number).sort((a,b)=>a-b);
+  for (const id of ids) {
+    const r = cycleData[id];
+    if (r.miss) csv += `${id},,,,QUERIED,MISSED\n`;
+    else csv += `${id},${r.vol},${r.flow},${r.hops},${r.method},OK\n`;
+  }
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })),
+    download: 'mira_cycle_' + new Date().toISOString().slice(0,10) + '.csv'
+  });
+  a.click();
+  URL.revokeObjectURL(a.href);
+  log('Exported cycle data as CSV', 'l-info');
+});
+
+/* ── Tab switching ── */
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('pane-' + btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'cycle') document.getElementById('dot-cycle').classList.remove('show');
+  });
+});
+
+/* ── Enable / disable controls ── */
+const CTRL_IDS = [
+  'qa-poll','qa-send','qa-data','qa-flood',
+  'd-btn-status','d-btn-time','d-btn-reset','d-btn-cloud',
+  'cy-refresh','cy-poll-btn',
+  'fm-add','fm-remove','fm-list','fm-clear',
+  'cl-status','cl-get-apn','cl-set-apn','cl-poll-send',
+  's-set-group','s-set-interval','s-set-phy',
+  's-get-cust','s-set-cust','s-get-time','s-set-time','s-get-reset','s-reboot',
+  'term-send','term-in'
+];
+function enableAll(on) {
+  CTRL_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = !on;
+  });
+}
+
+/* ── Dashboard buttons ── */
+document.getElementById('qa-poll').addEventListener('click', () => {
+  cycleData = {};
+  send('POLL_NOW');
+});
+document.getElementById('qa-send').addEventListener('click', () => {
+  if (!confirm('Start full poll cycle and upload to ThingsBoard?')) return;
+  cycleData = {};
+  send('POLL_AND_SEND');
+});
+document.getElementById('qa-data').addEventListener('click', () => { send('GET_DATA'); });
+document.getElementById('qa-flood').addEventListener('click', () => { send('TRIGGER_FLOOD'); });
+document.getElementById('d-btn-status').addEventListener('click', () => { send('STATUS'); send('LIST_FLOORS'); });
+document.getElementById('d-btn-time').addEventListener('click', () => { send('GET_TIME'); });
+document.getElementById('d-btn-reset').addEventListener('click', () => { send('GET_RESET_CAUSE'); });
+document.getElementById('d-btn-cloud').addEventListener('click', () => { send('CLOUD_STATUS'); });
+
+/* ── Cycle tab ── */
+document.getElementById('cy-refresh').addEventListener('click', () => { send('GET_DATA'); });
+document.getElementById('cy-poll-btn').addEventListener('click', () => {
+  const v = document.getElementById('cy-poll-id').value;
+  if (!v) return;
+  send('POLL ' + v);
+});
+
+/* ── Floor management buttons ── */
+document.getElementById('fm-add').addEventListener('click', () => {
+  const v = document.getElementById('fm-id').value;
+  if (!v) return;
+  send('ADD_FLOOR=' + v);
+});
+document.getElementById('fm-remove').addEventListener('click', () => {
+  const v = document.getElementById('fm-id').value;
+  if (!v) return;
+  if (!confirm(`Remove Floor ${v}?`)) return;
+  send('REMOVE_FLOOR=' + v);
+});
+document.getElementById('fm-list').addEventListener('click', () => {
+  registeredFloors.clear();
+  send('LIST_FLOORS');
+});
+document.getElementById('fm-clear').addEventListener('click', () => {
+  if (!confirm('Clear ALL registered floors? This cannot be undone.')) return;
+  send('CLEAR_FLOORS');
+});
+
+/* ── Cloud buttons ── */
+document.getElementById('cl-status').addEventListener('click', () => { send('CLOUD_STATUS'); });
+document.getElementById('cl-get-apn').addEventListener('click', () => { send('GET_APN'); });
+document.getElementById('cl-set-apn').addEventListener('click', () => {
+  const v = document.getElementById('cl-apn').value.trim();
+  if (!v) return;
+  send('SET_APN=' + v);
+});
+document.getElementById('cl-poll-send').addEventListener('click', () => {
+  if (!confirm('Start Poll & Send? Cycle will run and data will upload to ThingsBoard.')) return;
+  cycleData = {};
+  send('POLL_AND_SEND');
+});
+
+/* ── Settings buttons ── */
+document.getElementById('s-set-group').addEventListener('click', () => {
+  const v = document.getElementById('s-group').value;
+  if (!v) return;
+  if (!confirm(`Set Group ID to ${v}? Device will reboot.`)) return;
+  send('SET_GROUP_ID=' + v);
+});
+document.getElementById('s-set-interval').addEventListener('click', () => {
+  const v = document.getElementById('s-interval').value;
+  send('SET_SEND_INTERVAL=' + v);
+});
+document.getElementById('s-set-phy').addEventListener('click', () => {
+  const v = document.getElementById('s-phy').value;
+  if (!confirm(`Set PHY to ${v}? Device will reboot.`)) return;
+  send('SET_PHY=' + v);
+});
+document.getElementById('s-get-cust').addEventListener('click', () => { send('GET_CUST_CODE'); });
+document.getElementById('s-set-cust').addEventListener('click', () => {
+  const v = document.getElementById('s-cust-code').value.trim();
+  if (!v) return;
+  send('SET_CUST_CODE=' + v);
+});
+document.getElementById('s-get-time').addEventListener('click', () => { send('GET_TIME'); });
+document.getElementById('s-set-time').addEventListener('click', async () => {
+  const ts = Math.floor(Date.now() / 1000);
+  if (!confirm(`Set RTC to now (${new Date().toUTCString()})?\nThis also broadcasts TIME_SYNC to all floor nodes.`)) return;
+  send('SET_TIME=' + ts);
+});
+document.getElementById('s-get-reset').addEventListener('click', () => { send('GET_RESET_CAUSE'); });
+document.getElementById('s-reboot').addEventListener('click', () => {
+  if (!confirm('Reboot the Root Node?')) return;
+  send('RESET');
+});
+
+/* ── Settings live preview ── */
+document.getElementById('s-cust-code').addEventListener('input', updateNamePreview);
+document.getElementById('s-group').addEventListener('input', updateNamePreview);
+
+/* ── Terminal ── */
+const termIn = document.getElementById('term-in');
+termIn.addEventListener('keydown', e => { if (e.key === 'Enter') sendTerm(); });
+document.getElementById('term-send').addEventListener('click', sendTerm);
+document.getElementById('term-clear').addEventListener('click', () => { logBox.innerHTML = ''; });
+function sendTerm() {
+  const v = termIn.value.trim();
+  if (!v || !sppChar) return;
+  send(v);
+  termIn.value = '';
+}
+document.querySelectorAll('.qc').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    if (!sppChar) return;
+    send(a.textContent.trim());
+    /* Switch to terminal tab */
+    document.querySelectorAll('.tab').forEach(b => { if (b.dataset.tab === 'terminal') b.click(); });
+  });
+});
+
+/* ── Init ── */
+enableAll(false);
+refreshFloorGrid();
+log('MIRA MESH Root Manager ready. Tap Connect to begin.', 'l-info');
+</script>
+</body>
+</html>
