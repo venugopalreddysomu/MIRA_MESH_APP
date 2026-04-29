@@ -293,7 +293,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
       <div class="stat">
         <div class="s-lbl">RTC Time</div>
         <div class="s-val" style="font-size:12px;padding-top:6px;font-family:var(--mono)" id="d-time">—</div>
-        <div class="s-sub">UTC</div>
+        <div class="s-sub">IST</div>
       </div>
     </div>
     <div class="btn-row">
@@ -515,6 +515,14 @@ hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
     <p style="font-size:12px;color:var(--text-mute);margin-top:6px">
       BLE device name: <span id="s-name-preview" style="color:var(--text-dim)">RT_??001</span>
     </p>
+    <div class="field-row" style="margin-top:10px">
+      <label>BLE Device ID</label>
+      <input type="text" id="s-ble-id" readonly placeholder="Connect to populate">
+      <span class="unit"></span>
+    </div>
+    <p style="font-size:11px;color:var(--text-mute);margin-top:4px">
+      Browser-assigned ID (equals MAC address on Android/Chrome)
+    </p>
     <div class="btn-row">
       <button class="btn btn-ghost   btn-sm" id="s-get-cust" disabled>Get Code</button>
       <button class="btn btn-primary btn-sm" id="s-set-cust" disabled>Set Code</button>
@@ -669,7 +677,8 @@ function onConnected() {
   document.getElementById('hdr-dev').textContent = '';
   document.getElementById('btn-connect').style.display = 'none';
   document.getElementById('btn-disconnect').style.display = '';
-  log('Connected to ' + name, 'l-info');
+  document.getElementById('s-ble-id').value = bleDevice.id || '—';
+  log('Connected to ' + name + ' [' + (bleDevice.id || '?') + ']', 'l-info');
   enableAll(true);
   /* Auto-load status and floor list */
   setTimeout(() => { send('STATUS'); send('LIST_FLOORS'); send('GET_TIME'); send('GET_CUST_CODE'); }, 300);
@@ -684,6 +693,7 @@ function onDisconnected() {
   document.getElementById('btn-connect').style.display = '';
   document.getElementById('btn-disconnect').style.display = 'none';
   document.getElementById('hdr-dev').textContent = '';
+  document.getElementById('s-ble-id').value = '';
   enableAll(false);
   sppChar = null;
   resolvers.forEach(r => r.reject(new Error('disconnected')));
@@ -809,10 +819,9 @@ function dispatch(line) {
   /* TIME */
   const mTime = line.match(/(?:TIME unix=|OK TIME=)(\d+)/);
   if (mTime) {
-    const ts = +mTime[1];
-    const s = new Date(ts * 1000).toISOString().replace('T', ' ').slice(0, 19);
-    document.getElementById('d-time').textContent = s + ' UTC';
-    document.getElementById('s-rtc').value = s + ' UTC';
+    const s = toIST(+mTime[1]);
+    document.getElementById('d-time').textContent = s;
+    document.getElementById('s-rtc').value = s;
     return;
   }
 
@@ -862,9 +871,9 @@ function dispatch(line) {
   /* NET_TIME — time synced from network */
   const mNet = line.match(/^NET_TIME=(\d+)/);
   if (mNet) {
-    const s = new Date(+mNet[1] * 1000).toISOString().replace('T', ' ').slice(0, 19);
-    document.getElementById('d-time').textContent = s + ' UTC';
-    document.getElementById('s-rtc').value = s + ' UTC';
+    const s = toIST(+mNet[1]);
+    document.getElementById('d-time').textContent = s;
+    document.getElementById('s-rtc').value = s;
     return;
   }
 }
@@ -1159,6 +1168,16 @@ document.querySelectorAll('.qc').forEach(a => {
     document.querySelectorAll('.tab').forEach(b => { if (b.dataset.tab === 'terminal') b.click(); });
   });
 });
+
+/* ── IST formatter ── */
+function toIST(unixSec) {
+  return new Date(unixSec * 1000).toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric', month: 'short', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false
+  }) + ' IST';
+}
 
 /* ── Init ── */
 enableAll(false);
