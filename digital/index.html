@@ -1,0 +1,1088 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MIRA BLE Water meter configurator</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --border: #2e3347;
+    --accent: #3b82f6;
+    --accent-h: #2563eb;
+    --danger: #ef4444;
+    --warn: #f59e0b;
+    --ok: #22c55e;
+    --text: #e2e8f0;
+    --text-dim: #94a3b8;
+    --input-bg: #252836;
+    --font: 'Segoe UI', system-ui, sans-serif;
+    --mono: 'Consolas', 'Fira Code', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font);
+         font-size: 14px; min-height: 100vh; }
+  a { color: var(--accent); }
+
+  /* ── Layout ── */
+  .app { display: flex; flex-direction: column; height: 100vh; }
+  header { background: var(--card); border-bottom: 1px solid var(--border);
+           padding: 10px 16px; display: flex; align-items: center; gap: 12px;
+           flex-shrink: 0; }
+  header h1 { font-size: 15px; font-weight: 600; letter-spacing: .5px; }
+  .status-badge { padding: 3px 10px; border-radius: 20px; font-size: 12px;
+                  font-weight: 600; background: #333; color: var(--text-dim);
+                  transition: .3s; }
+  .status-badge.connected { background: #14532d; color: var(--ok); }
+  .status-badge.calib-on  { background: #713f12; color: var(--warn); }
+  .header-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .device-name  { font-size: 13px; color: var(--text-dim); }
+
+  /* ── Tabs ── */
+  .tabs { display: flex; gap: 2px; background: var(--card);
+          border-bottom: 1px solid var(--border); flex-shrink: 0;
+          overflow-x: auto; }
+  .tab-btn { padding: 9px 16px; background: none; border: none;
+             color: var(--text-dim); cursor: pointer; font-size: 13px;
+             border-bottom: 2px solid transparent; white-space: nowrap;
+             transition: .15s; }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .main-body { flex: 1; overflow-y: auto; padding: 16px; }
+
+  /* ── Cards ── */
+  .card { background: var(--card); border: 1px solid var(--border);
+          border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+  .card h2 { font-size: 13px; font-weight: 600; color: var(--text-dim);
+             text-transform: uppercase; letter-spacing: .8px; margin-bottom: 12px; }
+
+  /* ── Form rows ── */
+  .form-grid { display: grid; grid-template-columns: 180px 1fr auto;
+               gap: 8px 10px; align-items: center; }
+  .form-grid label { color: var(--text-dim); font-size: 13px; }
+  .form-grid .unit  { color: var(--text-dim); font-size: 12px; }
+  input, select {
+    background: var(--input-bg); border: 1px solid var(--border);
+    color: var(--text); border-radius: 6px; padding: 6px 10px;
+    font-size: 13px; width: 100%; font-family: var(--font);
+    transition: border .15s;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  input[readonly] { color: var(--text-dim); cursor: default; }
+
+  /* ── Buttons ── */
+  .btn { padding: 7px 16px; border-radius: 6px; border: none; cursor: pointer;
+         font-size: 13px; font-weight: 500; transition: .15s; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-h); }
+  .btn-success { background: #15803d; color: #fff; }
+  .btn-success:hover { background: #166534; }
+  .btn-danger  { background: var(--danger); color: #fff; }
+  .btn-danger:hover  { background: #dc2626; }
+  .btn-warn    { background: var(--warn); color: #000; }
+  .btn-warn:hover    { background: #d97706; }
+  .btn-ghost   { background: var(--input-bg); color: var(--text-dim);
+                 border: 1px solid var(--border); }
+  .btn-ghost:hover   { color: var(--text); border-color: #555; }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+
+  /* ── Reading display ── */
+  .readings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                   gap: 10px; }
+  .reading-box { background: var(--input-bg); border: 1px solid var(--border);
+                 border-radius: 8px; padding: 12px 14px; }
+  .reading-box .label { font-size: 11px; color: var(--text-dim);
+                        text-transform: uppercase; letter-spacing: .6px; }
+  .reading-box .value { font-size: 22px; font-weight: 700; font-family: var(--mono);
+                        color: var(--text); margin: 4px 0 2px; }
+  .reading-box .subval { font-size: 12px; color: var(--text-dim); }
+
+  /* ── Calibration table ── */
+  .calib-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .calib-table th { text-align: left; padding: 6px 8px; color: var(--text-dim);
+                    border-bottom: 1px solid var(--border); font-weight: 600;
+                    font-size: 11px; text-transform: uppercase; }
+  .calib-table td { padding: 4px 6px; border-bottom: 1px solid #1e2130; }
+  .calib-table td input { padding: 4px 8px; font-family: var(--mono); font-size: 12px; }
+  .calib-table tr:hover td { background: rgba(59,130,246,.05); }
+  .row-idx { color: var(--text-dim); font-size: 12px; font-family: var(--mono);
+             width: 32px; text-align: center; }
+
+  /* ── Terminal log ── */
+  .log-box { background: #0a0c13; border: 1px solid var(--border);
+             border-radius: 6px; padding: 10px 12px; height: 220px;
+             overflow-y: auto; font-family: var(--mono); font-size: 12px;
+             line-height: 1.6; }
+  .log-box .log-tx   { color: #60a5fa; }
+  .log-box .log-rx   { color: #4ade80; }
+  .log-box .log-err  { color: #f87171; }
+  .log-box .log-info { color: #94a3b8; }
+  .log-input-row { display: flex; gap: 8px; margin-top: 8px; }
+  .log-input-row input { font-family: var(--mono); flex: 1; }
+
+  /* ── Misc ── */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+  .warn-box { background: #431407; border: 1px solid #92400e; border-radius: 6px;
+              padding: 10px 14px; font-size: 13px; color: var(--warn);
+              margin-bottom: 12px; }
+  .ok-box   { background: #052e16; border: 1px solid #166534; border-radius: 6px;
+              padding: 10px 14px; font-size: 13px; color: var(--ok);
+              margin-bottom: 12px; }
+  .lock-overlay { text-align: center; padding: 20px; color: var(--text-dim); }
+  .lock-overlay .icon { font-size: 36px; margin-bottom: 8px; }
+  .inline-row { display: flex; gap: 8px; align-items: center; }
+  .inline-row input { flex: 1; }
+  select { cursor: pointer; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+  @media (max-width: 600px) {
+    .form-grid { grid-template-columns: 1fr; }
+    .readings-grid { grid-template-columns: 1fr 1fr; }
+  }
+
+  /* ── Live Beacons ── */
+  #devicesContainer { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 16px; }
+  .beacon-card {
+    background: var(--input-bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 20px; width: 100%; max-width: 350px;
+    position: relative; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2);
+  }
+  .beacon-header { font-size: 16px; font-weight: 700; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 10px; text-align: center; }
+  .beacon-rssi { position: absolute; top: 12px; right: 12px; font-size: 11px; background: #333; padding: 3px 8px; border-radius: 12px; color: var(--text-dim); }
+  .btn-connect-card { width: 100%; margin-top: 16px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ─── HEADER ──────────────────────────────────────────────────────────── -->
+<header>
+  <div>
+    <h1>MIRA BLE Water meter configurator</h1>
+  </div>
+  <span class="status-badge" id="conn-badge">Disconnected</span>
+  <span class="status-badge calib-on" id="calib-badge" style="display:none">CALIB MODE</span>
+  <div class="header-right">
+    <span class="device-name" id="hdr-device-name"></span>
+    <button class="btn btn-primary" id="btn-connect">Connect</button>
+    <button class="btn btn-ghost"   id="btn-disconnect" style="display:none">Disconnect</button>
+  </div>
+</header>
+
+<!-- ─── TABS ────────────────────────────────────────────────────────────── -->
+<div class="tabs">
+  <button class="tab-btn active" data-tab="live-beacons">Live Beacons</button>
+  <button class="tab-btn" data-tab="readings">Meter Readings</button>
+  <button class="tab-btn" data-tab="node-cfg">Node Settings</button>
+  <button class="tab-btn" data-tab="meter-cfg">Meter Config</button>
+  <button class="tab-btn" data-tab="calib-mode">Calibration Mode</button>
+  <button class="tab-btn" data-tab="calib-table">Calib Table</button>
+  <button class="tab-btn" data-tab="volume">Volume</button>
+  <button class="tab-btn" data-tab="terminal">Terminal</button>
+</div>
+
+<!-- ─── MAIN BODY ────────────────────────────────────────────────────────── -->
+<div class="main-body">
+
+<!-- ══ TAB: LIVE BEACONS ═══════════════════════════════════════════════════ -->
+<div class="tab-content active" id="tab-live-beacons">
+  <div class="card">
+    <h2>Scan for Live Advertisements</h2>
+    <p style="color:var(--text-dim);font-size:13px;margin-bottom:14px">
+      Click to scan for a meter. The browser will passively listen to its live BLE broadcasts 
+      without making a formal Bluetooth connection. You can connect later if you need to change settings.
+    </p>
+    <button class="btn btn-primary" id="btn-scan-beacons">Scan for Meter</button>
+    <div id="devicesContainer"></div>
+  </div>
+</div>
+
+<!-- ══ TAB: METER READINGS ══════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-readings">
+  <div class="card">
+    <h2>Live Meter Data</h2>
+    <div class="readings-grid">
+      <div class="reading-box">
+        <div class="label">Total Volume</div>
+        <div class="value" id="r-vol">—</div>
+        <div class="subval">Litres</div>
+      </div>
+      <div class="reading-box">
+        <div class="label">Flow Rate</div>
+        <div class="value" id="r-flow">—</div>
+        <div class="subval">L / min</div>
+      </div>
+      <div class="reading-box">
+        <div class="label">Forward Volume</div>
+        <div class="value" id="r-fwd">—</div>
+        <div class="subval">m³</div>
+      </div>
+      <div class="reading-box">
+        <div class="label">Reverse Volume</div>
+        <div class="value" id="r-bwd">—</div>
+        <div class="subval">m³</div>
+      </div>
+      <div class="reading-box">
+        <div class="label">Pump Running</div>
+        <div class="value" id="r-pump">—</div>
+        <div class="subval">minutes</div>
+      </div>
+      <div class="reading-box">
+        <div class="label">Device Name</div>
+        <div class="value" id="r-device-name">—</div>
+        <div class="subval"></div>
+      </div>
+      <div class="reading-box">
+        <div class="label">Uptime</div>
+        <div class="value" style="font-size:16px" id="r-uptime">—</div>
+        <div class="subval" id="r-reset-reason">Reset: —</div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-read-meter" disabled>Read All</button>
+      <button class="btn btn-ghost"   id="btn-auto-refresh" disabled>Auto (5s)</button>
+      <span id="last-read" style="color:var(--text-dim);font-size:12px;align-self:center"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TAB: NODE SETTINGS ════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-node-cfg">
+  <div class="card">
+    <h2>Device Configuration</h2>
+    <div class="form-grid">
+      <label>Device Name (WM)</label>
+      <input type="text" id="s-device-name" maxlength="6" placeholder="001021">
+      <span class="unit">Max 6 char</span>
+
+      <label>BLE TX Power</label>
+      <input type="number" id="s-tx-power" min="-26" max="6" value="0">
+      <span class="unit">dBm</span>
+
+      <label>Advertise Interval</label>
+      <input type="number" id="s-adv-interval" min="100" max="10000" value="1000">
+      <span class="unit">ms</span>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-read-status" disabled>Read Status</button>
+      <button class="btn btn-success" id="btn-write-name" disabled>Set Name</button>
+      <button class="btn btn-success" id="btn-write-interval" disabled>Set Interval</button>
+      <button class="btn btn-success" id="btn-write-tx" disabled>Set TX Power</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>RTC / Time</h2>
+    <div class="form-grid">
+      <label>Current RTC (IST)</label>
+      <input type="text" id="s-rtc" readonly placeholder="Click Get RTC to read">
+      <span class="unit"></span>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-get-time"     disabled>Get RTC</button>
+      <button class="btn btn-success" id="btn-set-time"     disabled>Set Time (Now)</button>
+      <button class="btn btn-warn"    id="btn-reset-device" disabled>Reboot Device</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TAB: METER CONFIG ═════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-meter-cfg">
+  <div id="meter-cfg-lock" class="lock-overlay" style="display:none">
+    <div class="icon">🔒</div>
+    <div>Writes require <strong>Calibration Mode</strong> (see Calibration Mode tab)</div>
+  </div>
+  <div class="card">
+    <h2>Pipe &amp; Sensor Parameters</h2>
+    <div class="warn-box" id="cfg-calib-warn" style="display:none">
+      ⚠ Calibration mode is ON — writes will take effect immediately and are saved to NVM3.
+    </div>
+    <div class="form-grid">
+      <label>Speed of Sound</label>
+      <input type="number" id="c-sos" step="0.1" placeholder="e.g. 1521.7">
+      <span class="unit">m/s</span>
+
+      <label>Pipe Radius</label>
+      <input type="number" id="c-radius" step="0.0001" placeholder="e.g. 0.012">
+      <span class="unit">m</span>
+
+      <label>Pipe Length</label>
+      <input type="number" id="c-length" step="0.0001" placeholder="e.g. 0.065">
+      <span class="unit">m</span>
+
+      <label>Max Flow Rate</label>
+      <input type="number" id="c-maxflow" step="0.01" placeholder="e.g. 15.0">
+      <span class="unit">m³/hr</span>
+
+      <label>Min Flow Rate</label>
+      <input type="number" id="c-minflow" step="0.0001" placeholder="e.g. 0.010">
+      <span class="unit">m³/hr</span>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-read-cfg"  disabled>Read Config</button>
+      <button class="btn btn-success" id="btn-write-sos"    disabled>Set SOS</button>
+      <button class="btn btn-success" id="btn-write-radius" disabled>Set Radius</button>
+      <button class="btn btn-success" id="btn-write-length" disabled>Set Length</button>
+      <button class="btn btn-success" id="btn-write-maxflow" disabled>Set Max Flow</button>
+      <button class="btn btn-success" id="btn-write-minflow" disabled>Set Min Flow</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TAB: CALIBRATION MODE ════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-calib-mode">
+  <div class="card">
+    <h2>Calibration Mode</h2>
+    <p style="color:var(--text-dim);font-size:13px;margin-bottom:14px;line-height:1.6">
+      Calibration mode pauses all mesh activity so SPP communication is not
+      interrupted during configuration. Writes to Meter Config and the
+      Calibration Table are only allowed while calibration mode is active.<br><br>
+      Enter the secret code to unlock. The mode is cleared on SPP disconnect
+      or reboot — it is <strong>not</strong> persisted to flash.
+    </p>
+
+    <div id="calib-off-panel">
+      <div class="form-grid" style="max-width:480px">
+        <label>Secret Code</label>
+        <input type="password" id="calib-code" placeholder="Enter code (e.g. 44477 or 0xABCD)">
+        <span class="unit"></span>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-warn" id="btn-calib-unlock" disabled>Unlock Calibration Mode</button>
+      </div>
+    </div>
+
+    <div id="calib-on-panel" style="display:none">
+      <div class="ok-box">✓ Calibration mode is ACTIVE — mesh TX/RX is paused, writes are enabled.</div>
+      <div class="btn-row">
+        <button class="btn btn-danger" id="btn-calib-lock" disabled>Exit Calibration Mode</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TAB: CALIBRATION TABLE ═══════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-calib-table">
+  <div id="table-lock-notice" class="warn-box" style="display:none">
+    ⚠ Writes require Calibration Mode to be active.
+  </div>
+  <div class="card">
+    <h2>Volumetric Flow Correction Table (20 rows)</h2>
+    <p style="color:var(--text-dim);font-size:12px;margin-bottom:10px">
+      Column 0: Flow rate (m³/hr) — Column 1: Gain factor
+    </p>
+    <div style="overflow-x:auto">
+      <table class="calib-table" id="calib-table-el">
+        <thead><tr>
+          <th>#</th>
+          <th>Flow (m³/hr)</th>
+          <th>Gain factor</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="calib-table-body"></tbody>
+      </table>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-read-table"      disabled>Read Table</button>
+      <button class="btn btn-success" id="btn-write-table-all" disabled>Write All Rows</button>
+      <button class="btn btn-ghost"   id="btn-export-table">Export CSV</button>
+      <button class="btn btn-ghost"   id="btn-import-table">Import CSV</button>
+    </div>
+    <input type="file" id="import-file" accept=".csv" style="display:none">
+  </div>
+</div>
+
+<!-- ══ TAB: VOLUME ═══════════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-volume">
+  <div class="card">
+    <h2>Volume Management</h2>
+    <p style="color:var(--text-dim);font-size:13px;margin-bottom:14px">
+      Write a new accumulated volume counter.  The value is set immediately and
+      saved to FRAM + NVM3.  Use this for meter resets or calibration offsets.
+    </p>
+    <div class="form-grid">
+      <label>Current Volume</label>
+      <input type="text" id="v-current" readonly placeholder="Read from device">
+      <span class="unit">Litres</span>
+
+      <label>New Volume</label>
+      <input type="number" id="v-new" min="0" step="0.01" placeholder="e.g. 123.45">
+      <span class="unit">Litres</span>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-read-vol"  disabled>Read Volume</button>
+      <button class="btn btn-danger"  id="btn-write-vol" disabled>Write Volume</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TAB: TERMINAL ══════════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-terminal">
+  <div class="card">
+    <h2>Raw SPP Terminal</h2>
+    <div class="log-box" id="log-box"></div>
+    <div class="log-input-row">
+      <input type="text" id="term-input" placeholder="Enter SPP command and press Enter" disabled>
+      <button class="btn btn-primary" id="btn-term-send" disabled>Send</button>
+      <button class="btn btn-ghost"   id="btn-term-clear">Clear</button>
+    </div>
+    <div style="margin-top:8px;color:var(--text-dim);font-size:12px">
+      Quick:
+      <a href="#" class="quick-cmd">STATUS</a> &nbsp;
+      <a href="#" class="quick-cmd">GET_METER_ALL</a> &nbsp;
+      <a href="#" class="quick-cmd">GET_CFG</a> &nbsp;
+      <a href="#" class="quick-cmd">GET_TABLE</a> &nbsp;
+      <a href="#" class="quick-cmd">GET_CALIB_STATUS</a> &nbsp;
+      <a href="#" class="quick-cmd">GET_TIME</a>
+    </div>
+  </div>
+</div>
+
+</div><!-- end .main-body -->
+</div><!-- end .app -->
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+ * MIRA MESH Floor Node Configurator — Web Bluetooth SPP client
+ *
+ * BLE SPP Service  : 4880c12c-fdcb-4077-8920-a450d7f9b907
+ * SPP Data Char    : fec26ec4-6d71-4442-9f81-55bc21d658d6
+ *   Write (no rsp) : send ASCII command + \n
+ *   Notify         : receive ASCII response lines
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+const SPP_SVC  = '4880c12c-fdcb-4077-8920-a450d7f9b907';
+const SPP_CHAR = 'fec26ec4-6d71-4442-9f81-55bc21d658d6';
+const COMPANY_ID = 0xFFFF;
+
+/* ── State ── */
+let bleDevice    = null;
+let bleServer    = null;
+let sppChar      = null;
+let rxBuf        = '';          /* accumulator for partial BLE notifications */
+let connected    = false;
+let calibActive  = false;
+let autoTimer    = null;
+let pendingLines = [];          /* queue of received response lines */
+let resolvers    = [];          /* promise resolvers waiting for lines */
+const devicesMap = new Map();
+
+/* ── Build calibration table HTML rows ── */
+(function buildTable() {
+  const tbody = document.getElementById('calib-table-body');
+  for (let r = 0; r < 20; r++) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="row-idx">${r}</td>
+      <td><input type="number" id="t-flow-${r}" step="0.00001" placeholder="0.00000"></td>
+      <td><input type="number" id="t-gain-${r}" step="0.00000001" placeholder="0.00000000"></td>
+      <td>
+        <button class="btn btn-ghost" style="padding:3px 10px;font-size:11px"
+                onclick="writeTableRow(${r})" id="tbtn-${r}" disabled>Write</button>
+      </td>`;
+    tbody.appendChild(tr);
+  }
+})();
+
+/* ─── Logging ──────────────────────────────────────────────────────────────*/
+const logBox = document.getElementById('log-box');
+function log(msg, cls = 'log-info') {
+  const ts = new Date().toLocaleTimeString('en', { hour12: false });
+  const div = document.createElement('div');
+  div.className = cls;
+  div.textContent = `[${ts}] ${msg}`;
+  logBox.appendChild(div);
+  logBox.scrollTop = logBox.scrollHeight;
+}
+
+/* ─── Live Beacons Scanner ──────────────────────────────────────────────────*/
+document.getElementById('btn-scan-beacons').addEventListener('click', async () => {
+    try {
+        if (!navigator.bluetooth) { alert('Web Bluetooth is not supported in this browser.'); return; }
+        log('Scanning for beacon advertisements…', 'log-info');
+        const device = await navigator.bluetooth.requestDevice({
+            filters: [{ namePrefix: "WM" }, { namePrefix: "ST" }],
+            optionalManufacturerData: [COMPANY_ID],
+            optionalServices: [SPP_SVC]
+        });
+        
+        device.addEventListener('advertisementreceived', (event) => {
+            const dataView = event.manufacturerData.get(COMPANY_ID);
+            if (dataView) decodeAndBuildCard(event.device, dataView, event.rssi);
+        });
+        
+        await device.watchAdvertisements();
+        document.getElementById('btn-scan-beacons').textContent = `Scanning... (Add More)`;
+        document.getElementById('btn-scan-beacons').classList.replace('btn-primary', 'btn-success');
+        log('Listening for ' + device.name + ' advertisements...', 'log-info');
+    } catch (e) {
+        log('Scan error: ' + e.message, 'log-err');
+    }
+});
+
+const ignoredDevices = new Set();
+
+function decodeAndBuildCard(device, dataView, rssi) {
+    if (ignoredDevices.has(device.id)) return;
+    devicesMap.set(device.id, device);
+    if (dataView.byteLength < 13) return;
+    const flow = dataView.getFloat32(0, true);
+    const vol = dataView.getFloat64(4, true);
+    const status = dataView.getUint8(12);
+    
+    const isRev = (status & 1) !== 0;
+    const isEmp = (status & 2) !== 0;
+    const isLeak = (status & 4) !== 0;
+    const isBatt = (status & 8) !== 0;
+
+    let card = document.getElementById(`beacon-${device.id}`);
+    if (!card) {
+        card = document.createElement('div');
+        card.id = `beacon-${device.id}`;
+        card.className = 'beacon-card';
+        card.innerHTML = `
+            <button class="btn" style="position:absolute; top:8px; left:8px; padding:2px 8px; font-size:10px; background:var(--danger); color:#fff; border:none;" onclick="removeCard('${device.id}')">X</button>
+            <div class="beacon-rssi" id="rssi-${device.id}"></div>
+            <div class="beacon-header">${device.name || 'Unknown'}</div>
+            <div class="readings-grid" style="grid-template-columns:1fr 1fr; margin-bottom:10px;">
+                <div class="reading-box" style="padding:10px;">
+                    <div class="label">Total Volume</div>
+                    <div class="value" id="b-vol-${device.id}" style="font-size:20px;">0.00</div>
+                    <div class="subval">m³</div>
+                </div>
+                <div class="reading-box" style="padding:10px;">
+                    <div class="label">Flow Rate</div>
+                    <div class="value" id="b-flow-${device.id}" style="font-size:20px;">0.00</div>
+                    <div class="subval">L/min</div>
+                </div>
+            </div>
+            <div class="status-grid">
+                <div class="status-item" id="b-dir-${device.id}"></div>
+                <div class="status-item" id="b-pipe-${device.id}"></div>
+            </div>
+            <button class="btn btn-success btn-connect-card" onclick="connectToScannedDevice('${device.id}')">Connect & Configure</button>
+        `;
+        document.getElementById('devicesContainer').appendChild(card);
+    }
+    document.getElementById(`rssi-${device.id}`).textContent = `${rssi} dBm`;
+    document.getElementById(`b-vol-${device.id}`).textContent = vol.toFixed(4);
+    document.getElementById(`b-flow-${device.id}`).textContent = flow.toFixed(2);
+    
+    const elDir = document.getElementById(`b-dir-${device.id}`);
+    elDir.textContent = isRev ? 'Reverse Flow' : 'Forward Flow';
+    elDir.className = `status-item ${isRev ? 'status-warn' : 'status-ok'}`;
+
+    const elPipe = document.getElementById(`b-pipe-${device.id}`);
+    elPipe.textContent = isEmp ? 'Pipe Empty' : 'Pipe Full';
+    elPipe.className = `status-item ${isEmp ? 'status-warn' : 'status-ok'}`;
+}
+
+window.removeCard = function(id) {
+    ignoredDevices.add(id);
+    const card = document.getElementById(`beacon-${id}`);
+    if (card) card.remove();
+}
+
+window.connectToScannedDevice = async function(id) {
+    const dev = devicesMap.get(id);
+    if (!dev) return;
+    document.querySelector('[data-tab="readings"]').click(); // Switch tab
+    
+    if (bleDevice && bleDevice.gatt.connected && bleDevice.id !== id) {
+        bleDevice.gatt.disconnect();
+    }
+    bleDevice = dev;
+    await doGattConnection();
+}
+
+/* ─── BLE Connect ──────────────────────────────────────────────────────────*/
+document.getElementById('btn-connect').addEventListener('click', async () => {
+  if (!navigator.bluetooth) {
+    alert('Web Bluetooth is not supported in this browser.\nUse Chrome/Edge on desktop or Android.');
+    return;
+  }
+  try {
+    log('Scanning for MIRA MESH devices…', 'log-info');
+    bleDevice = await navigator.bluetooth.requestDevice({
+      filters: [{ namePrefix: "WM" }, { namePrefix: "ST" }],
+      optionalManufacturerData: [COMPANY_ID],
+      optionalServices: [SPP_SVC]
+    });
+    await doGattConnection();
+  } catch (e) {
+    log('Connect error: ' + e.message, 'log-err');
+  }
+});
+
+async function doGattConnection() {
+  try {
+    bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+    log('Connecting to GATT server...', 'log-info');
+    bleServer = await bleDevice.gatt.connect();
+    const svc = await bleServer.getPrimaryService(SPP_SVC);
+    sppChar   = await svc.getCharacteristic(SPP_CHAR);
+    await sppChar.startNotifications();
+    sppChar.addEventListener('characteristicvaluechanged', onNotification);
+    onConnected();
+  } catch (e) {
+    log('GATT connect error: ' + e.message, 'log-err');
+  }
+}
+
+document.getElementById('btn-disconnect').addEventListener('click', () => {
+  if (bleDevice && bleDevice.gatt.connected) bleDevice.gatt.disconnect();
+});
+
+function onConnected() {
+  connected = true;
+  const name = bleDevice.name || 'MIRA FLOOR';
+  document.getElementById('conn-badge').textContent = 'Connected: ' + name;
+  document.getElementById('conn-badge').classList.add('connected');
+  document.getElementById('hdr-device-name').textContent = '';
+  document.getElementById('btn-connect').style.display = 'none';
+  document.getElementById('btn-disconnect').style.display = '';
+  log('Connected to ' + name, 'log-info');
+  enableControls(true);
+}
+
+function onDisconnected() {
+  connected = false;
+  calibActive = false;
+  stopAutoRefresh();
+  document.getElementById('conn-badge').textContent = 'Disconnected';
+  document.getElementById('conn-badge').classList.remove('connected');
+  document.getElementById('calib-badge').style.display = 'none';
+  document.getElementById('btn-connect').style.display = '';
+  document.getElementById('btn-disconnect').style.display = 'none';
+  document.getElementById('hdr-device-name').textContent = '';
+  enableControls(false);
+  updateCalibUI();
+  log('Disconnected', 'log-info');
+  sppChar = null;
+  resolvers.forEach(r => r.reject(new Error('disconnected')));
+  resolvers = [];
+}
+
+/* ─── BLE Receive ──────────────────────────────────────────────────────────*/
+function onNotification(event) {
+  const raw = new TextDecoder().decode(event.target.value);
+  rxBuf += raw;
+  const lines = rxBuf.split(/\r?\n/);
+  rxBuf = lines.pop();           /* keep incomplete last segment */
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    log('← ' + line, 'log-rx');
+    dispatchLine(line.trim());
+    pendingLines.push(line.trim());
+    /* wake any waiting promise resolver */
+    if (resolvers.length) resolvers.shift().resolve(line.trim());
+  }
+}
+
+/* Dispatch a received line to UI parsers */
+function dispatchLine(line) {
+  /* Meter All */
+  const mAll = line.match(/VOL=(\S+)\s+FLOW=(\S+)\s+FWD=(\S+)\s+BWD=(\S+)\s+PUMP=(\S+)/);
+  if (mAll) {
+    document.getElementById('r-vol').textContent  = mAll[1];
+    document.getElementById('r-flow').textContent = mAll[2];
+    document.getElementById('r-fwd').textContent  = mAll[3];
+    document.getElementById('r-bwd').textContent  = mAll[4];
+    document.getElementById('r-pump').textContent = mAll[5];
+    document.getElementById('last-read').textContent = 'Updated ' + new Date().toLocaleTimeString();
+    return;
+  }
+  /* VOL only */
+  const mVol = line.match(/^VOL=(\S+)\s+L$/);
+  if (mVol) {
+    document.getElementById('r-vol').textContent = mVol[1];
+    document.getElementById('v-current').value   = mVol[1];
+    return;
+  }
+  /* FLOW only */
+  const mFlow = line.match(/^FLOW=(\S+)\s+L\/min$/);
+  if (mFlow) {
+    document.getElementById('r-flow').textContent = mFlow[1];
+    return;
+  }
+  /* STATUS line */
+  if (line.startsWith('NAME=')) {
+    // NAME=001021 INTERVAL=1000 TX_PWR=0
+    const mName  = line.match(/NAME=([^\s]+)/);
+    const mInt   = line.match(/INTERVAL=(\d+)/);
+    const mTx    = line.match(/TX_PWR=([-\d]+)/);
+
+    if (mName) {
+      document.getElementById('r-device-name').textContent = 'WM' + mName[1];
+      document.getElementById('s-device-name').value = mName[1];
+    }
+    if (mInt) {
+      document.getElementById('s-adv-interval').value = mInt[1];
+    }
+    if (mTx) {
+      document.getElementById('s-tx-power').value = mTx[1];
+    }
+  }
+  /* Config line */
+  const mCfg = line.match(/SOS=(\S+)\s+RADIUS=(\S+)\s+LENGTH=(\S+)\s+MAX_FLOW=(\S+)\s+MIN_FLOW=(\S+)/);
+  if (mCfg) {
+    document.getElementById('c-sos').value     = mCfg[1];
+    document.getElementById('c-radius').value  = mCfg[2];
+    document.getElementById('c-length').value  = mCfg[3];
+    document.getElementById('c-maxflow').value = mCfg[4];
+    document.getElementById('c-minflow').value = mCfg[5];
+    return;
+  }
+  /* Calibration table row: TABLE[n]=flow,gain */
+  const mTRow = line.match(/^TABLE\[(\d+)\]=(\S+),(\S+)$/);
+  if (mTRow) {
+    const r = parseInt(mTRow[1]);
+    if (r >= 0 && r < 20) {
+      document.getElementById(`t-flow-${r}`).value = mTRow[2];
+      document.getElementById(`t-gain-${r}`).value = mTRow[3];
+    }
+    return;
+  }
+  /* RTC time — GET_TIME: "TIME unix=<ts> ..."  SET_TIME OK: "OK TIME=<ts> ..." */
+  const mTime = line.match(/(?:TIME unix=|OK TIME=)(\d+)/);
+  if (mTime) {
+    document.getElementById('s-rtc').value = toIST(parseInt(mTime[1]));
+    return;
+  }
+  /* Uptime — "UPTIME=<s> RESET=<reason> UP=<Xd..h..m..s>" */
+  const mUp = line.match(/^UPTIME=\d+\s+RESET=(\S+)\s+UP=(\S+)/);
+  if (mUp) {
+    document.getElementById('r-uptime').textContent       = mUp[2];
+    document.getElementById('r-reset-reason').textContent = 'Reset: ' + mUp[1];
+    return;
+  }
+  /* CALIB status */
+  if (line === 'CALIB=ON' || line.startsWith('OK CALIB=ON')) {
+    calibActive = true; updateCalibUI(); return;
+  }
+  if (line === 'CALIB=OFF' || line.startsWith('OK CALIB=OFF')) {
+    calibActive = false; updateCalibUI(); return;
+  }
+}
+
+/* ─── Send ─────────────────────────────────────────────────────────────────*/
+async function send(cmd) {
+  if (!sppChar) return;
+  log('→ ' + cmd, 'log-tx');
+  const data = new TextEncoder().encode(cmd + '\n');
+  const CHUNK = 20;
+  try {
+    for (let i = 0; i < data.byteLength; i += CHUNK) {
+      await sppChar.writeValueWithoutResponse(data.slice(i, i + CHUNK));
+    }
+  } catch (e) {
+    log('✗ BLE write failed: ' + e.message + ' (' + data.byteLength + ' bytes)', 'log-err');
+  }
+}
+
+/* Wait for a line matching a prefix (timeout 4 s) */
+function waitLine(prefix, timeout = 4000) {
+  return new Promise((resolve, reject) => {
+    const tid = setTimeout(() => {
+      resolvers = resolvers.filter(r => r.resolve !== resolve);
+      reject(new Error('timeout waiting for: ' + prefix));
+    }, timeout);
+    resolvers.push({
+      resolve: (line) => {
+        clearTimeout(tid);
+        resolve(line);
+      },
+      reject
+    });
+  });
+}
+
+/* ─── Tab switching ─────────────────────────────────────────────────────────*/
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+/* ─── Enable / Disable all action controls ──────────────────────────────────*/
+const ACTION_BTNS = [
+  'btn-read-meter','btn-auto-refresh','btn-read-status',
+  'btn-write-name','btn-write-interval',
+  'btn-write-tx',
+  'btn-get-time','btn-set-time','btn-reset-device',
+  'btn-read-cfg',
+  'btn-calib-unlock','btn-calib-lock',
+  'btn-read-table','btn-write-table-all',
+  'btn-read-vol','btn-write-vol',
+  'btn-term-send','term-input'
+];
+function enableControls(on) {
+  ACTION_BTNS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = !on;
+  });
+  if (!on) {
+    /* calib write buttons always off when disconnected */
+    ['btn-write-sos','btn-write-radius','btn-write-length',
+     'btn-write-maxflow','btn-write-minflow'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.disabled = true;
+    });
+    for (let r = 0; r < 20; r++) {
+      const el = document.getElementById(`tbtn-${r}`); if (el) el.disabled = true;
+    }
+  } else {
+    /* read config is always on when connected */
+    const rcfg = document.getElementById('btn-read-cfg');
+    if (rcfg) rcfg.disabled = false;
+    updateCalibWriteButtons();
+  }
+}
+
+function updateCalibWriteButtons() {
+  const on = connected && calibActive;
+  ['btn-write-sos','btn-write-radius','btn-write-length',
+   'btn-write-maxflow','btn-write-minflow'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.disabled = !on;
+  });
+  for (let r = 0; r < 20; r++) {
+    const el = document.getElementById(`tbtn-${r}`); if (el) el.disabled = !on;
+  }
+  const wta = document.getElementById('btn-write-table-all');
+  if (wta) wta.disabled = !on;
+}
+
+function updateCalibUI() {
+  document.getElementById('calib-badge').style.display = calibActive ? '' : 'none';
+  document.getElementById('calib-off-panel').style.display = calibActive ? 'none' : '';
+  document.getElementById('calib-on-panel').style.display  = calibActive ? '' : 'none';
+  const warn = document.getElementById('cfg-calib-warn');
+  if (warn) warn.style.display = calibActive ? '' : 'none';
+  const notice = document.getElementById('table-lock-notice');
+  if (notice) notice.style.display = (!calibActive && connected) ? '' : 'none';
+  updateCalibWriteButtons();
+}
+
+/* ─── Auto refresh ──────────────────────────────────────────────────────────*/
+let autoOn = false;
+document.getElementById('btn-auto-refresh').addEventListener('click', () => {
+  autoOn = !autoOn;
+  document.getElementById('btn-auto-refresh').textContent = autoOn ? 'Stop Auto' : 'Auto (5s)';
+  document.getElementById('btn-auto-refresh').className   = autoOn ? 'btn btn-warn' : 'btn btn-ghost';
+  if (autoOn) { autoTimer = setInterval(readMeter, 5000); readMeter(); }
+  else        { stopAutoRefresh(); }
+});
+function stopAutoRefresh() {
+  autoOn = false;
+  clearInterval(autoTimer);
+  const b = document.getElementById('btn-auto-refresh');
+  if (b) { b.textContent = 'Auto (5s)'; b.className = 'btn btn-ghost'; }
+}
+
+/* ─── Meter readings ────────────────────────────────────────────────────────*/
+async function readMeter() {
+  if (!sppChar) return;
+  await send('GET_METER_ALL');
+  await send('STATUS');
+  await send('GET_UPTIME');
+}
+document.getElementById('btn-read-meter').addEventListener('click', readMeter);
+
+/* ─── Node settings ─────────────────────────────────────────────────────────*/
+document.getElementById('btn-read-status').addEventListener('click', () => send('STATUS'));
+
+document.getElementById('btn-write-name').addEventListener('click', async () => {
+  const v = document.getElementById('s-device-name').value.trim();
+  if (!v || v.length > 6) { alert('Invalid name (max 6 characters)'); return; }
+  if (!confirm(`Set Device Name to ${v}? Device will reboot.`)) return;
+  await send(`SET_NAME=${v}`);
+});
+
+document.getElementById('btn-write-interval').addEventListener('click', async () => {
+  const v = document.getElementById('s-adv-interval').value;
+  if (!v) return;
+  await send(`SET_ADV_INTERVAL=${v}`);
+});
+
+document.getElementById('btn-write-tx').addEventListener('click', async () => {
+  const v = document.getElementById('s-tx-power').value;
+  if (!v) return;
+  await send(`SET_TX_POWER=${v}`);
+});
+
+/* ─── IST formatter ─────────────────────────────────────────────────────────*/
+function toIST(unixSec) {
+  return new Date(unixSec * 1000).toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric', month: 'short', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false
+  }) + ' IST';
+}
+
+/* ─── RTC ───────────────────────────────────────────────────────────────────*/
+document.getElementById('btn-get-time').addEventListener('click', () => send('GET_TIME'));
+document.getElementById('btn-set-time').addEventListener('click', async () => {
+  const ts = Math.floor(Date.now() / 1000);
+  await send(`SET_TIME=${ts}`);
+});
+document.getElementById('btn-reset-device').addEventListener('click', async () => {
+  if (!confirm('Reboot the device?')) return;
+  await send('RESET');
+});
+
+/* ─── Meter config ──────────────────────────────────────────────────────────*/
+document.getElementById('btn-read-cfg').addEventListener('click', () => send('GET_CFG'));
+document.getElementById('btn-write-sos').addEventListener('click', () => {
+  const v = document.getElementById('c-sos').value; if (v) send(`SET_SOS=${v}`);
+});
+document.getElementById('btn-write-radius').addEventListener('click', () => {
+  const v = document.getElementById('c-radius').value; if (v) send(`SET_PIPE_RADIUS=${v}`);
+});
+document.getElementById('btn-write-length').addEventListener('click', () => {
+  const v = document.getElementById('c-length').value; if (v) send(`SET_PIPE_LENGTH=${v}`);
+});
+document.getElementById('btn-write-maxflow').addEventListener('click', () => {
+  const v = document.getElementById('c-maxflow').value; if (v) send(`SET_MAX_FLOW=${v}`);
+});
+document.getElementById('btn-write-minflow').addEventListener('click', () => {
+  const v = document.getElementById('c-minflow').value; if (v) send(`SET_MIN_FLOW=${v}`);
+});
+
+/* ─── Calibration mode ───────────────────────────────────────────────────────*/
+document.getElementById('btn-calib-unlock').addEventListener('click', async () => {
+  const code = document.getElementById('calib-code').value.trim();
+  if (!code) { alert('Enter the secret code.'); return; }
+  await send(`CALIB_UNLOCK=${code}`);
+  document.getElementById('calib-code').value = '';
+});
+document.getElementById('btn-calib-lock').addEventListener('click', async () => {
+  await send('CALIB_LOCK');
+});
+
+/* ─── Calibration table ──────────────────────────────────────────────────────*/
+document.getElementById('btn-read-table').addEventListener('click', () => send('GET_TABLE'));
+document.getElementById('btn-write-table-all').addEventListener('click', async () => {
+  if (!calibActive) { alert('Enable Calibration Mode first.'); return; }
+  if (!confirm('Write all 20 table rows to device?')) return;
+  for (let r = 0; r < 20; r++) {
+    const flow = document.getElementById(`t-flow-${r}`).value;
+    const gain = document.getElementById(`t-gain-${r}`).value;
+    if (!flow || !gain) { alert(`Row ${r} is incomplete.`); return; }
+    await send(`SET_TABLE_ROW=${r},${flow},${gain}`);
+    await new Promise(res => setTimeout(res, 80)); /* small gap between writes */
+  }
+  log('All table rows sent.', 'log-info');
+});
+window.writeTableRow = async function(r) {
+  if (!calibActive) { alert('Enable Calibration Mode first.'); return; }
+  const flow = document.getElementById(`t-flow-${r}`).value;
+  const gain = document.getElementById(`t-gain-${r}`).value;
+  if (!flow || !gain) { alert(`Fill both values for row ${r}.`); return; }
+  await send(`SET_TABLE_ROW=${r},${flow},${gain}`);
+};
+
+/* ─── Calibration table export / import ─────────────────────────────────────*/
+document.getElementById('btn-export-table').addEventListener('click', () => {
+  let csv = 'row,flow_m3hr,gain\n';
+  for (let r = 0; r < 20; r++) {
+    const flow = document.getElementById(`t-flow-${r}`).value || '0';
+    const gain = document.getElementById(`t-gain-${r}`).value || '0';
+    csv += `${r},${flow},${gain}\n`;
+  }
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'mira_calib_table.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  log('Calibration table exported as mira_calib_table.csv', 'log-info');
+});
+
+document.getElementById('btn-import-table').addEventListener('click', () => {
+  document.getElementById('import-file').click();
+});
+
+document.getElementById('import-file').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const lines = ev.target.result.split(/\r?\n/).filter(l => l.trim() && !l.startsWith('row'));
+    let count = 0;
+    for (const line of lines) {
+      const parts = line.split(',');
+      if (parts.length < 3) continue;
+      const r    = parseInt(parts[0]);
+      const flow = parts[1].trim();
+      const gain = parts[2].trim();
+      if (!isNaN(r) && r >= 0 && r < 20) {
+        document.getElementById(`t-flow-${r}`).value = flow;
+        document.getElementById(`t-gain-${r}`).value = gain;
+        count++;
+      }
+    }
+    log(`Imported ${count} rows from "${file.name}". Review and click Write All Rows to apply.`, 'log-info');
+    e.target.value = '';   /* reset so the same file can be re-imported */
+  };
+  reader.readAsText(file);
+});
+
+/* ─── Volume ─────────────────────────────────────────────────────────────────*/
+document.getElementById('btn-read-vol').addEventListener('click', () => send('GET_VOL'));
+document.getElementById('btn-write-vol').addEventListener('click', async () => {
+  const v = document.getElementById('v-new').value;
+  if (!v) { alert('Enter new volume in Litres.'); return; }
+  const litres    = parseFloat(v);
+  const litres100 = Math.round(litres * 100);
+  if (!confirm(`Set volume to ${litres.toFixed(2)} L?`)) return;
+  await send(`SET_VOL=${litres100}`);
+});
+
+/* ─── Terminal ───────────────────────────────────────────────────────────────*/
+const termInput = document.getElementById('term-input');
+termInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendTermCmd();
+});
+document.getElementById('btn-term-send').addEventListener('click', sendTermCmd);
+document.getElementById('btn-term-clear').addEventListener('click', () => {
+  logBox.innerHTML = '';
+});
+function sendTermCmd() {
+  const v = termInput.value.trim();
+  if (!v || !sppChar) return;
+  send(v);
+  termInput.value = '';
+}
+document.querySelectorAll('.quick-cmd').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    if (!sppChar) return;
+    send(a.textContent.trim());
+    /* Switch to terminal tab to see response */
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      if (b.dataset.tab === 'terminal') b.click();
+    });
+  });
+});
+
+/* ─── Initial state ──────────────────────────────────────────────────────────*/
+enableControls(false);
+updateCalibUI();
+log('MIRA MESH Configurator loaded. Click "Connect" to begin.', 'log-info');
+</script>
+</body>
+</html>
