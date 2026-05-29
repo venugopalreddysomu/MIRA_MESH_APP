@@ -278,6 +278,14 @@
         <option value="0">Storage (SPP-only)</option>
       </select>
       <span class="unit"></span>
+
+      <label>Display Show Mode</label>
+      <select id="s-disp-mode">
+        <option value="0">Alternate Volume &amp; Flow (5s)</option>
+        <option value="1">Show Volume Only</option>
+        <option value="2">Show Flowrate Only</option>
+      </select>
+      <span class="unit"></span>
     </div>
     <div class="btn-row">
       <button class="btn btn-primary" id="btn-read-status" disabled>Read Status</button>
@@ -287,6 +295,7 @@
       <button class="btn btn-success" id="btn-write-phy" disabled>Set PHY</button>
       <button class="btn btn-success" id="btn-write-tx" disabled>Set TX Power</button>
       <button class="btn btn-success" id="btn-write-mode" disabled>Set Mode</button>
+      <button class="btn btn-success" id="btn-write-disp-mode" disabled>Set Display Mode</button>
     </div>
   </div>
 
@@ -624,6 +633,8 @@ function dispatchLine(line) {
     document.getElementById('s-tx-power').value   = mFloor[5];
     const mMode = line.match(/MODE=(\d+)/);
     if (mMode) document.getElementById('s-mode').value = mMode[1];
+    const mDisp = line.match(/DISP_MODE=(\d+)/);
+    if (mDisp) document.getElementById('s-disp-mode').value = mDisp[1];
     return;
   }
   /* Config line */
@@ -718,7 +729,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 const ACTION_BTNS = [
   'btn-read-meter','btn-auto-refresh','btn-read-status',
   'btn-write-floor-id','btn-write-group-id','btn-write-interval',
-  'btn-write-phy','btn-write-tx','btn-write-mode',
+  'btn-write-phy','btn-write-tx','btn-write-mode','btn-write-disp-mode',
   'btn-get-time','btn-set-time','btn-reset-device',
   'btn-read-cfg',
   'btn-calib-unlock','btn-calib-lock',
@@ -836,6 +847,11 @@ document.getElementById('btn-write-mode').addEventListener('click', async () => 
   const label = v === '0' ? 'STORAGE (mesh inactive)' : 'NORMAL (mesh active)';
   if (!confirm(`Set mode to ${label}?`)) return;
   await send(`SET_MODE=${v}`);
+});
+
+document.getElementById('btn-write-disp-mode').addEventListener('click', async () => {
+  const v = document.getElementById('s-disp-mode').value;
+  await send(`SET_DISP_MODE=${v}`);
 });
 
 /* ─── IST formatter ─────────────────────────────────────────────────────────*/
