@@ -149,6 +149,127 @@
     .form-grid { grid-template-columns: 1fr; }
     .readings-grid { grid-template-columns: 1fr 1fr; }
   }
+/* ── TOF Diagnostics ── */
+  .diag-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .badge-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .irq-badge {
+    padding: 6px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+    background: #252836;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    transition: all 0.2s ease;
+  }
+  .irq-badge.active-green {
+    background: rgba(34, 197, 94, 0.15);
+    border-color: var(--ok);
+    color: #4ade80;
+  }
+  .irq-badge.active-red {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: var(--danger);
+    color: #f87171;
+  }
+  .irq-badge.active-warn {
+    background: rgba(245, 158, 11, 0.15);
+    border-color: var(--warn);
+    color: #fbbf24;
+  }
+  .flag-good {
+    background: rgba(34, 197, 94, 0.15) !important;
+    border: 1px solid var(--ok) !important;
+    color: #4ade80 !important;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+  .flag-bad {
+    background: rgba(239, 68, 68, 0.15) !important;
+    border: 1px solid var(--danger) !important;
+    color: #f87171 !important;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+  .status-badge-inline {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    display: inline-block;
+  }
+  .diag-table tr.row-danger td {
+    background: rgba(239, 68, 68, 0.08) !important;
+    border-bottom: 1px solid rgba(239, 68, 68, 0.2);
+  }
+  .diag-table tr.row-warn td {
+    background: rgba(245, 158, 11, 0.08) !important;
+    border-bottom: 1px solid rgba(245, 158, 11, 0.2);
+  }
+  .ratio-card-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .ratio-card-row:last-child {
+    border-bottom: none;
+  }
+  .ratio-val {
+    font-family: var(--mono);
+    font-weight: bold;
+    font-size: 15px;
+  }
+  .ratio-val.highlight-warn {
+    color: var(--warn);
+    text-shadow: 0 0 8px rgba(245,158,11,0.3);
+  }
+  .ratio-val.highlight-danger {
+    color: var(--danger);
+    text-shadow: 0 0 8px rgba(239,68,68,0.3);
+  }
+  .diag-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .diag-table th {
+    text-align: left;
+    padding: 8px;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+  }
+  .diag-table td {
+    padding: 8px;
+    border-bottom: 1px solid #1e2130;
+    font-family: var(--mono);
+  }
+  .diag-table tr:hover td {
+    background: rgba(59,130,246,0.05);
+  }
+  .diag-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
 </style>
 </head>
 <body>
@@ -177,6 +298,8 @@
   <button class="tab-btn" data-tab="calib-mode">Calibration Mode</button>
   <button class="tab-btn" data-tab="calib-table">Calib Table</button>
   <button class="tab-btn" data-tab="volume">Volume</button>
+  <button class="tab-btn" data-tab="max35103-regs">MAX35103 Regs</button>
+  <button class="tab-btn" data-tab="tof-diag">TOF Diagnostics</button>
   <button class="tab-btn" data-tab="terminal">Terminal</button>
 </div>
 
@@ -278,14 +401,6 @@
         <option value="0">Storage (SPP-only)</option>
       </select>
       <span class="unit"></span>
-
-      <label>Display Show Mode</label>
-      <select id="s-disp-mode">
-        <option value="0">Alternate Volume &amp; Flow (5s)</option>
-        <option value="1">Show Volume Only</option>
-        <option value="2">Show Flowrate Only</option>
-      </select>
-      <span class="unit"></span>
     </div>
     <div class="btn-row">
       <button class="btn btn-primary" id="btn-read-status" disabled>Read Status</button>
@@ -295,7 +410,6 @@
       <button class="btn btn-success" id="btn-write-phy" disabled>Set PHY</button>
       <button class="btn btn-success" id="btn-write-tx" disabled>Set TX Power</button>
       <button class="btn btn-success" id="btn-write-mode" disabled>Set Mode</button>
-      <button class="btn btn-success" id="btn-write-disp-mode" disabled>Set Display Mode</button>
     </div>
   </div>
 
@@ -442,7 +556,593 @@
       <button class="btn btn-danger"  id="btn-write-vol" disabled>Write Volume</button>
     </div>
   </div>
+
+  <!-- Daily Consumption History -->
+  <div class="card">
+    <h2>Daily Consumption History (31 Days)</h2>
+    <p style="color:var(--text-dim);font-size:13px;margin-bottom:14px">
+      Circular buffer of the last 31 daily water consumption logs. Reading is manual on-demand to prevent BLE communication overload.
+    </p>
+    <div class="btn-row" style="margin-top:0; margin-bottom:12px;">
+      <button class="btn btn-primary" id="btn-read-daily-logs" disabled>Read Daily Logs</button>
+      <span id="daily-read-progress" style="color:var(--text-dim);font-size:12px;align-self:center;margin-left:8px;"></span>
+    </div>
+    <div style="max-height: 250px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px;">
+      <table class="calib-table">
+        <thead>
+          <tr>
+            <th>Index</th>
+            <th>Date (IST)</th>
+            <th>Volume (Liters)</th>
+            <th>Cumulative (Liters)</th>
+            <th>Status Flags</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="daily-logs-body">
+          <tr>
+            <td colspan="6" style="text-align:center; padding:15px; color:var(--text-dim);">No data read. Click "Read Daily Logs" to fetch.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Update Daily Log -->
+  <div class="card" style="position: relative;">
+    <div id="daily-logs-lock" class="lock-overlay" style="display:none">
+      <div class="icon">🔒</div>
+      <div>Daily Log edits require <strong>Calibration Mode</strong> (see Calibration Mode tab)</div>
+    </div>
+    <h2>Update Daily Log Entry</h2>
+    <p style="color:var(--text-dim);font-size:13px;margin-bottom:14px">
+      Modify a specific daily record slot in the circular buffer.
+    </p>
+    <div class="form-grid">
+      <label>Day Index</label>
+      <select id="daily-edit-idx" disabled>
+        <!-- Options 0 to 30 will be generated -->
+      </select>
+      <span class="unit"></span>
+
+      <label>Date Selector</label>
+      <input type="datetime-local" id="daily-edit-date" disabled>
+      <span class="unit">Local Time</span>
+
+      <label>Timestamp (Unix)</label>
+      <input type="number" id="daily-edit-ts" min="0" placeholder="Unix Epoch seconds" disabled>
+      <span class="unit">seconds</span>
+
+      <label>Volume (Liters)</label>
+      <input type="number" id="daily-edit-vol" min="0" placeholder="e.g. 50" disabled>
+      <span class="unit">L</span>
+
+      <label>Cumulative Volume</label>
+      <input type="number" id="daily-edit-cum" min="0" placeholder="e.g. 100000" disabled>
+      <span class="unit">L</span>
+
+      <label>Status Flags</label>
+      <input type="number" id="daily-edit-flags" min="0" placeholder="e.g. 0" disabled>
+      <span class="unit">Hex/Dec</span>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-success" id="btn-write-daily-log" disabled>Update Daily Log</button>
+    </div>
+  </div>
+
+  <!-- Monthly Consumption History -->
+  <div class="card">
+    <h2>Monthly Consumption History (12 Months)</h2>
+    <p style="color:var(--text-dim);font-size:13px;margin-bottom:14px">
+      Circular buffer of the last 12 monthly water consumption logs. Reading is manual on-demand.
+    </p>
+    <div class="btn-row" style="margin-top:0; margin-bottom:12px;">
+      <button class="btn btn-primary" id="btn-read-monthly-logs" disabled>Read Monthly Logs</button>
+      <span id="monthly-read-progress" style="color:var(--text-dim);font-size:12px;align-self:center;margin-left:8px;"></span>
+    </div>
+    <div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px;">
+      <table class="calib-table">
+        <thead>
+          <tr>
+            <th>Index</th>
+            <th>Month/Year</th>
+            <th>Volume (Liters)</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="monthly-logs-body">
+          <tr>
+            <td colspan="4" style="text-align:center; padding:15px; color:var(--text-dim);">No data read. Click "Read Monthly Logs" to fetch.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Update Monthly Log -->
+  <div class="card" style="position: relative;">
+    <div id="monthly-logs-lock" class="lock-overlay" style="display:none">
+      <div class="icon">🔒</div>
+      <div>Monthly Log edits require <strong>Calibration Mode</strong> (see Calibration Mode tab)</div>
+    </div>
+    <h2>Update Monthly Log Entry</h2>
+    <p style="color:var(--text-dim);font-size:13px;margin-bottom:14px">
+      Modify a specific monthly record slot in the circular buffer.
+    </p>
+    <div class="form-grid">
+      <label>Month Index</label>
+      <select id="monthly-edit-idx" disabled>
+        <!-- Options 0 to 11 will be generated -->
+      </select>
+      <span class="unit"></span>
+
+      <label>Date Selector</label>
+      <input type="datetime-local" id="monthly-edit-date" disabled>
+      <span class="unit">Local Time</span>
+
+      <label>Timestamp (Unix)</label>
+      <input type="number" id="monthly-edit-ts" min="0" placeholder="Unix Epoch seconds" disabled>
+      <span class="unit">seconds</span>
+
+      <label>Volume (Liters)</label>
+      <input type="number" id="monthly-edit-vol" min="0" placeholder="e.g. 1500" disabled>
+      <span class="unit">L</span>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-success" id="btn-write-monthly-log" disabled>Update Monthly Log</button>
+    </div>
+  </div>
 </div>
+
+<!-- ══ TAB: MAX35103 REGISTERS ══════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-max35103-regs">
+  <div id="max-regs-lock" class="lock-overlay" style="display:none">
+    <div class="icon">🔒</div>
+    <div>Writes require <strong>Calibration Mode</strong> (see Calibration Mode tab)</div>
+  </div>
+
+  <div class="card">
+    <h2>MAX35103 Configuration Parameters</h2>
+    <div class="warn-box" id="regs-calib-warn" style="display:none">
+      ⚠ Calibration mode is ON — writes will take effect immediately and save to NVM3.
+    </div>
+
+    <h3>Pulse Launcher & TOF (TOF1 &amp; TOF2)</h3>
+    <div class="form-grid">
+      <label>Bias Charge Time (CT)</label>
+      <select id="f-ct">
+        <option value="0">0 µs (No delay)</option>
+        <option value="1">10 µs</option>
+        <option value="2">50 µs</option>
+        <option value="3">100 µs</option>
+      </select>
+      <span class="unit">CT[1:0]</span>
+
+      <label>Drive Pulse Frequency (DPL)</label>
+      <select id="f-dpl">
+        <option value="0">4 MHz</option>
+        <option value="1">2 MHz</option>
+        <option value="2">1 MHz</option>
+        <option value="3">500 kHz</option>
+        <option value="4">250 kHz</option>
+        <option value="5">125 kHz</option>
+        <option value="6">62.5 kHz</option>
+        <option value="7">31.25 kHz</option>
+      </select>
+      <span class="unit">DPL[3:0]</span>
+
+      <label>Pulse Launch Count (PL)</label>
+      <input type="number" id="f-pl" min="1" max="255" placeholder="e.g. 17">
+      <span class="unit">PL[7:0] (Pulses = PL + 1)</span>
+
+      <label>Stop Hit Count</label>
+      <input type="number" id="f-stop" min="1" max="6" placeholder="e.g. 6">
+      <span class="unit">STOP[2:0] (1 to 6 hits)</span>
+
+      <label>T2 Wave Number</label>
+      <input type="number" id="f-t2wv" min="1" max="63" placeholder="e.g. 35">
+      <span class="unit">T2WV[5:0]</span>
+
+      <label>TOF Cycle</label>
+      <input type="number" id="f-tof-cyc" min="0" max="7" placeholder="e.g. 2">
+      <span class="unit">TOF_CYC[2:0]</span>
+
+      <label>Measurement Timeout</label>
+      <input type="number" id="f-timout" min="0" max="7" placeholder="e.g. 2">
+      <span class="unit">TIMOUT[2:0]</span>
+    </div>
+
+    <h3>Wave Selectors (TOF3, TOF4, TOF5)</h3>
+    <div class="form-grid">
+      <label>Hit 1 Wave</label>
+      <input type="number" id="f-hit1wv" min="1" max="63">
+      <span class="unit">HIT1WV[5:0]</span>
+
+      <label>Hit 2 Wave</label>
+      <input type="number" id="f-hit2wv" min="1" max="63">
+      <span class="unit">HIT2WV[5:0]</span>
+
+      <label>Hit 3 Wave</label>
+      <input type="number" id="f-hit3wv" min="1" max="63">
+      <span class="unit">HIT3WV[5:0]</span>
+
+      <label>Hit 4 Wave</label>
+      <input type="number" id="f-hit4wv" min="1" max="63">
+      <span class="unit">HIT4WV[5:0]</span>
+
+      <label>Hit 5 Wave</label>
+      <input type="number" id="f-hit5wv" min="1" max="63">
+      <span class="unit">HIT5WV[5:0]</span>
+
+      <label>Hit 6 Wave</label>
+      <input type="number" id="f-hit6wv" min="1" max="63">
+      <span class="unit">HIT6WV[5:0]</span>
+    </div>
+
+    <h3>Offsets & Timing Delay (TOF6, TOF7, TOF_MEAS_DELAY)</h3>
+    <div class="form-grid">
+      <label>Comparator Offset 1</label>
+      <input type="text" id="f-tof6" maxlength="4" placeholder="0048">
+      <span class="unit">TOF6 (Hex)</span>
+
+      <label>Comparator Offset 2</label>
+      <input type="text" id="f-tof7" maxlength="4" placeholder="0048">
+      <span class="unit">TOF7 (Hex)</span>
+
+      <label>Squelch Delay</label>
+      <input type="number" id="f-delay" min="0" max="65535" placeholder="e.g. 136">
+      <span class="unit" id="f-delay-us">0.00 µs (DLY × 250ns)</span>
+    </div>
+
+    <h3>Event Manager &amp; Clock (EVTMG1, EVTMG2, CALIB, CRYSTAL)</h3>
+    <div class="form-grid">
+      <label>Event Timing 1</label>
+      <input type="text" id="f-evtmg1" maxlength="4" placeholder="0180">
+      <span class="unit">EVTMG1 (Hex)</span>
+
+      <label>Event Timing 2</label>
+      <input type="text" id="f-evtmg2" maxlength="4" placeholder="004F">
+      <span class="unit">EVTMG2 (Hex)</span>
+
+      <label>Calibration Control</label>
+      <input type="text" id="f-calib-ctrl" maxlength="4" placeholder="0373">
+      <span class="unit">CAL (Hex)</span>
+
+      <label>Crystal Config</label>
+      <input type="text" id="f-crystal" maxlength="4" placeholder="0000">
+      <span class="unit">XTAL (Hex)</span>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-success" id="btn-write-params" disabled>Write Parameters</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>MAX35103 Raw Registers Map</h2>
+    <div style="overflow-x:auto">
+      <table class="calib-table">
+        <thead>
+          <tr>
+            <th>Addr</th>
+            <th>Register Name</th>
+            <th>Hex Value (16-bit)</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="raw-regs-body">
+          <!-- Dynamically populated rows -->
+        </tbody>
+      </table>
+    </div>
+    <div class="btn-row" style="margin-top:16px">
+      <button class="btn btn-primary" id="btn-read-regs-all" disabled>Read All Registers</button>
+      <button class="btn btn-success" id="btn-write-regs-all" disabled>Write All Registers</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TAB: TOF DIAGNOSTICS ═════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-tof-diag">
+  <div class="card">
+    <div class="diag-section-header">
+      <h2>Time-of-Flight (TOF) Diagnostics &amp; Status</h2>
+      <div class="inline-row" style="margin-left: auto; gap: 12px;">
+        <span id="diag-last-read" style="color:var(--text-dim);font-size:12px;"></span>
+      </div>
+    </div>
+    <div class="btn-row" style="margin-top:0; margin-bottom:16px;">
+      <button class="btn btn-primary" id="btn-read-diag" disabled>Read TOF Diagnostics</button>
+      <button class="btn btn-ghost" id="btn-auto-diag" disabled>Auto Read (2s)</button>
+    </div>
+
+    <div class="readings-grid" style="margin-bottom: 20px;">
+      <div class="reading-box">
+        <div class="label">Live Flow Rate</div>
+        <div class="value" id="diag-flow-rate">— L/h</div>
+        <div class="subval" id="diag-flow-rate-lpm">— L/min</div>
+      </div>
+      <div class="reading-box">
+        <div class="label">Pipe Status</div>
+        <div class="value" id="diag-pipe-empty" style="font-size: 16px; margin-top: 8px;">—</div>
+        <div class="subval">Early Edge Timing Detection</div>
+      </div>
+      <div class="reading-box">
+        <div class="label">System Error Status</div>
+        <div class="value" id="diag-error-flag" style="font-size: 16px; margin-top: 8px;">—</div>
+        <div class="subval">Flowrate / Max Limit Check</div>
+      </div>
+    </div>
+
+    <div class="diag-grid">
+      <!-- Interrupt Status Card -->
+      <div class="card" style="margin-bottom:0; background:rgba(255,255,255,0.02)">
+        <h2>Interrupt Status (Reg 0xFE)</h2>
+        <div style="font-size: 15px; font-family: var(--mono); margin-bottom: 10px; border-bottom: 1px solid var(--border); padding-bottom: 8px; display: flex; justify-content: space-between;">
+          <span>Last Cached Status:</span>
+          <span id="diag-irq-hex" style="font-weight:bold; color:var(--accent)">0x0000</span>
+        </div>
+        <div class="badge-grid" id="diag-irq-badges">
+          <div class="irq-badge" id="irq-bit-TO" title="Timeout">TO (Bit 15)</div>
+          <div class="irq-badge" id="irq-bit-AF" title="Alarm Flag">AF (Bit 14)</div>
+          <div class="irq-badge" id="irq-bit-TOF" title="Time of Flight Measurement Done">TOF (Bit 12)</div>
+          <div class="irq-badge" id="irq-bit-TE" title="Temperature Measurement Done">TE (Bit 11)</div>
+          <div class="irq-badge" id="irq-bit-LDO" title="LDO Regulator Settled">LDO (Bit 10)</div>
+          <div class="irq-badge" id="irq-bit-TOF_EVTMG" title="TOF Event Timing Done">TOF_EVT (Bit 9)</div>
+          <div class="irq-badge" id="irq-bit-TEMP_EVTMG" title="Temp Event Timing Done">TMP_EVT (Bit 8)</div>
+          <div class="irq-badge" id="irq-bit-FLASH" title="Flash Operation Complete">FLASH (Bit 7)</div>
+          <div class="irq-badge" id="irq-bit-CAL" title="Calibration Complete">CAL (Bit 6)</div>
+          <div class="irq-badge" id="irq-bit-HALT" title="Halt Completed">HALT (Bit 5)</div>
+          <div class="irq-badge" id="irq-bit-CSWI" title="Commutation Switch Complete">CSWI (Bit 4)</div>
+          <div class="irq-badge" id="irq-bit-INIT" title="Init State Completed">INIT (Bit 3)</div>
+          <div class="irq-badge" id="irq-bit-POR" title="Power On Reset Detected">POR (Bit 2)</div>
+        </div>
+      </div>
+
+      <!-- Wave Ratios Card -->
+      <div class="card" style="margin-bottom:0; background:rgba(255,255,255,0.02)">
+        <h2>Wave Ratios (0xC4 / 0xD3)</h2>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; height: 100%;">
+          <div style="border-right: 1px solid var(--border); padding-right: 12px;">
+            <h3 style="font-size:12px; color:var(--accent); text-transform:uppercase; margin-bottom:8px;">Upstream (WVRUP)</h3>
+            <div class="ratio-card-row">
+              <span style="color:var(--text-dim)">t1 / t2</span>
+              <span class="ratio-val" id="ratio-up-t1t2">—</span>
+            </div>
+            <div class="ratio-card-row">
+              <span style="color:var(--text-dim)">t2 / tideal</span>
+              <span class="ratio-val" id="ratio-up-t2ideal">—</span>
+            </div>
+          </div>
+          <div style="padding-left: 4px;">
+            <h3 style="font-size:12px; color:var(--accent); text-transform:uppercase; margin-bottom:8px;">Downstream (WVRDN)</h3>
+            <div class="ratio-card-row">
+              <span style="color:var(--text-dim)">t1 / t2</span>
+              <span class="ratio-val" id="ratio-dn-t1t2">—</span>
+            </div>
+            <div class="ratio-card-row">
+              <span style="color:var(--text-dim)">t2 / tideal</span>
+              <span class="ratio-val" id="ratio-dn-t2ideal">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Averages and Difference -->
+    <div class="card" style="background:rgba(255,255,255,0.02)">
+      <h2>TOF Averages &amp; Difference</h2>
+      <div style="overflow-x:auto">
+        <table class="diag-table">
+          <thead>
+            <tr>
+              <th>Measurement / Register</th>
+              <th>Address</th>
+              <th>Hex Value</th>
+              <th>Decimal</th>
+              <th>Time (µs)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Upstream TOF Average (AVGUP)</td>
+              <td>0xD1</td>
+              <td id="avg-up-hex">—</td>
+              <td id="avg-up-dec">—</td>
+              <td id="avg-up-us" style="color:var(--ok); font-weight:bold;">—</td>
+            </tr>
+            <tr>
+              <td>Downstream TOF Average (AVGDOWN)</td>
+              <td>0xE0</td>
+              <td id="avg-dn-hex">—</td>
+              <td id="avg-dn-dec">—</td>
+              <td id="avg-dn-us" style="color:var(--ok); font-weight:bold;">—</td>
+            </tr>
+            <tr>
+              <td>TOF Difference (TOF_DIFF)</td>
+              <td>0xE2</td>
+              <td id="diff-hex">—</td>
+              <td id="diff-dec">—</td>
+              <td id="diff-us" style="color:var(--warn); font-weight:bold;">—</td>
+            </tr>
+            <tr>
+              <td>TOF Difference Average (TOF_DIFF_AVG)</td>
+              <td>0xE5</td>
+              <td id="diff-avg-hex">—</td>
+              <td id="diff-avg-dec">—</td>
+              <td id="diff-avg-us" style="color:var(--warn); font-weight:bold;">—</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Estimated Parameters Card -->
+    <div class="card" style="background:rgba(255,255,255,0.02)">
+      <h2>Estimated Fluid Properties (Experiment)</h2>
+      <div style="overflow-x:auto; margin-bottom: 1rem;">
+        <table class="diag-table">
+          <thead>
+            <tr>
+              <th>Property</th>
+              <th>Derived Value</th>
+              <th>Unit</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Estimated Speed of Sound (SOS)</td>
+              <td id="est-sos" style="color:var(--ok); font-weight:bold; font-size:1.15rem;">—</td>
+              <td>m/s</td>
+            </tr>
+            <tr>
+              <td>Estimated Water Temperature (WT)</td>
+              <td id="est-wt" style="color:var(--warn); font-weight:bold; font-size:1.15rem;">—</td>
+              <td>°C</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      
+      <!-- Calibration Parameter Tuning -->
+      <div class="form-grid" style="max-width:500px; margin-top: 1rem;">
+        <label>Transducer Delay</label>
+        <input type="number" id="c-est-tdelay" step="0.001" min="0" max="20" placeholder="e.g. 2.200">
+        <button class="btn btn-success" id="btn-write-est-tdelay" disabled style="margin-left:10px;">Set Delay (µs)</button>
+      </div>
+    </div>
+
+    <!-- Raw Hits side-by-side -->
+    <div class="card" style="margin-bottom:0; background:rgba(255,255,255,0.02)">
+      <h2>Raw Hits Comparison (1 to 6)</h2>
+      <div style="overflow-x:auto">
+        <table class="diag-table">
+          <thead>
+            <tr>
+              <th>Hit #</th>
+              <th>Upstream Hex (0xC5+)</th>
+              <th>Upstream Time (µs)</th>
+              <th>Downstream Hex (0xD4+)</th>
+              <th>Downstream Time (µs)</th>
+              <th>Delta (Up - Down) (ns)</th>
+            </tr>
+          </thead>
+          <tbody id="diag-raw-hits-body">
+            <tr>
+              <td>Hit 1</td>
+              <td id="hit-up-hex-0">—</td>
+              <td id="hit-up-us-0">—</td>
+              <td id="hit-dn-hex-0">—</td>
+              <td id="hit-dn-us-0">—</td>
+              <td id="hit-delta-ns-0" style="font-weight:bold;">—</td>
+            </tr>
+            <tr>
+              <td>Hit 2</td>
+              <td id="hit-up-hex-1">—</td>
+              <td id="hit-up-us-1">—</td>
+              <td id="hit-dn-hex-1">—</td>
+              <td id="hit-dn-us-1">—</td>
+              <td id="hit-delta-ns-1" style="font-weight:bold;">—</td>
+            </tr>
+            <tr>
+              <td>Hit 3</td>
+              <td id="hit-up-hex-2">—</td>
+              <td id="hit-up-us-2">—</td>
+              <td id="hit-dn-hex-2">—</td>
+              <td id="hit-dn-us-2">—</td>
+              <td id="hit-delta-ns-2" style="font-weight:bold;">—</td>
+            </tr>
+            <tr>
+              <td>Hit 4</td>
+              <td id="hit-up-hex-3">—</td>
+              <td id="hit-up-us-3">—</td>
+              <td id="hit-dn-hex-3">—</td>
+              <td id="hit-dn-us-3">—</td>
+              <td id="hit-delta-ns-3" style="font-weight:bold;">—</td>
+            </tr>
+            <tr>
+              <td>Hit 5</td>
+              <td id="hit-up-hex-4">—</td>
+              <td id="hit-up-us-4">—</td>
+              <td id="hit-dn-hex-4">—</td>
+              <td id="hit-dn-us-4">—</td>
+              <td id="hit-delta-ns-4" style="font-weight:bold;">—</td>
+            </tr>
+            <tr>
+              <td>Hit 6</td>
+              <td id="hit-up-hex-5">—</td>
+              <td id="hit-up-us-5">—</td>
+              <td id="hit-dn-hex-5">—</td>
+              <td id="hit-dn-us-5">—</td>
+              <td id="hit-delta-ns-5" style="font-weight:bold;">—</td>
+            </tr>
+            <!-- Summary Delta Rows -->
+            <tr style="border-top: 2px solid var(--border); background: rgba(255,255,255,0.015);">
+              <td style="font-weight: bold; color: var(--accent);">Average Delta (AVGUP - AVGDOWN)</td>
+              <td id="hit-up-hex-avg" style="color: var(--text-dim);">—</td>
+              <td id="hit-up-us-avg" style="font-weight: bold; color: var(--ok);">—</td>
+              <td id="hit-dn-hex-avg" style="color: var(--text-dim);">—</td>
+              <td id="hit-dn-us-avg" style="font-weight: bold; color: var(--ok);">—</td>
+              <td id="hit-delta-ns-avg" style="font-weight:bold; color: var(--ok);">—</td>
+            </tr>
+            <tr style="background: rgba(255,255,255,0.015);">
+              <td style="font-weight: bold; color: var(--accent);">Hardware TOF Diff (TOF_DIFF)</td>
+              <td colspan="4" style="text-align: right; color: var(--text-dim); padding-right: 16px;">Reg 0xE2: <span id="hit-up-hex-diff">—</span></td>
+              <td id="hit-delta-ns-diff" style="font-weight:bold; color: var(--warn);">—</td>
+            </tr>
+            <tr style="background: rgba(255,255,255,0.015);">
+              <td style="font-weight: bold; color: var(--accent);">Hardware TOF Diff Avg (TOF_DIFF_AVG)</td>
+              <td colspan="4" style="text-align: right; color: var(--text-dim); padding-right: 16px;">Reg 0xE5: <span id="hit-up-hex-diffavg">—</span></td>
+              <td id="hit-delta-ns-diffavg" style="font-weight:bold; color: var(--warn);">—</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TOF Diagnostics Log History -->
+    <div class="card" style="margin-top:20px; background:rgba(255,255,255,0.02)">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h2>Diagnostic Log History</h2>
+        <div class="btn-row" style="margin-top:0; gap:8px;">
+          <button class="btn btn-success" id="btn-export-log-csv">Export CSV</button>
+          <button class="btn btn-danger" id="btn-clear-log-table">Clear Log</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto; max-height: 400px; border: 1px solid var(--border); border-radius: 6px;">
+        <table class="diag-table" id="diag-log-table">
+          <thead>
+            <tr>
+              <th style="min-width: 90px;">Time</th>
+              <th style="min-width: 85px;">Flow Rate</th>
+              <th style="min-width: 105px;">Pipe Status</th>
+              <th style="min-width: 105px;">Sys Status</th>
+              <th style="min-width: 70px;">IRQ</th>
+              <th style="min-width: 110px;">WVRUP (t1/t2)</th>
+              <th style="min-width: 110px;">WVRDN (t1/t2)</th>
+              <th style="min-width: 90px;">Avg Up (µs)</th>
+              <th style="min-width: 90px;">Avg Down (µs)</th>
+              <th style="min-width: 95px;">AVG Δ (ns)</th>
+              <th style="min-width: 95px;">T_DIFF (ns)</th>
+              <th style="min-width: 105px;">T_DIFF_AVG (ns)</th>
+              <th style="min-width: 80px;">H1 Δ (ns)</th>
+              <th style="min-width: 80px;">H2 Δ (ns)</th>
+              <th style="min-width: 80px;">H3 Δ (ns)</th>
+              <th style="min-width: 80px;">H4 Δ (ns)</th>
+              <th style="min-width: 80px;">H5 Δ (ns)</th>
+              <th style="min-width: 80px;">H6 Δ (ns)</th>
+            </tr>
+          </thead>
+          <tbody id="diag-log-body">
+            <!-- Dynamically populated log rows -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
 
 <!-- ══ TAB: TERMINAL ══════════════════════════════════════════════════════════ -->
 <div class="tab-content" id="tab-terminal">
@@ -492,6 +1192,11 @@ let calibActive  = false;
 let autoTimer    = null;
 let pendingLines = [];          /* queue of received response lines */
 let resolvers    = [];          /* promise resolvers waiting for lines */
+
+let dailyLogsCache = Array(31).fill(null);
+let monthlyLogsCache = Array(12).fill(null);
+let dailyLogsReadCount = 0;
+let monthlyLogsReadCount = 0;
 
 /* ── Build calibration table HTML rows ── */
 (function buildTable() {
@@ -597,6 +1302,83 @@ function onNotification(event) {
 
 /* Dispatch a received line to UI parsers */
 function dispatchLine(line) {
+  /* Daily Logs row parsing */
+  const mDaily = line.match(/^DAILY\[(\d+)\]=(\d+),(\d+),(\d+),(\d+)$/);
+  if (mDaily) {
+    const idx = parseInt(mDaily[1]);
+    const ts = parseInt(mDaily[2]);
+    const vol = parseInt(mDaily[3]);
+    const cum = parseInt(mDaily[4]);
+    const flags = parseInt(mDaily[5]);
+    if (idx >= 0 && idx < 31) {
+      dailyLogsCache[idx] = { timestamp: ts, vol: vol, cum: cum, flags: flags };
+      dailyLogsReadCount++;
+      const el = document.getElementById('daily-read-progress');
+      if (el) el.textContent = `Received ${dailyLogsReadCount}/31...`;
+    }
+    return;
+  }
+  if (line === 'DAILY_END') {
+    const el = document.getElementById('daily-read-progress');
+    if (el) el.textContent = `Completed! ${dailyLogsReadCount} records loaded.`;
+    renderDailyLogsTable();
+    return;
+  }
+
+  /* Monthly Logs row parsing */
+  const mMonthly = line.match(/^MONTHLY\[(\d+)\]=(\d+),(\d+)$/);
+  if (mMonthly) {
+    const idx = parseInt(mMonthly[1]);
+    const ts = parseInt(mMonthly[2]);
+    const vol = parseInt(mMonthly[3]);
+    if (idx >= 0 && idx < 12) {
+      monthlyLogsCache[idx] = { timestamp: ts, vol: vol };
+      monthlyLogsReadCount++;
+      const el = document.getElementById('monthly-read-progress');
+      if (el) el.textContent = `Received ${monthlyLogsReadCount}/12...`;
+    }
+    return;
+  }
+  if (line === 'MONTHLY_END') {
+    const el = document.getElementById('monthly-read-progress');
+    if (el) el.textContent = `Completed! ${monthlyLogsReadCount} records loaded.`;
+    renderMonthlyLogsTable();
+    return;
+  }
+
+  /* Confirmation lines */
+  const mDailyUpd = line.match(/^OK DAILY_LOG\[(\d+)\] UPDATED$/);
+  if (mDailyUpd) {
+    const idx = parseInt(mDailyUpd[1]);
+    log(`Daily Log [${idx}] successfully updated on device.`, 'log-info');
+    const formIdx = parseInt(document.getElementById('daily-edit-idx').value);
+    if (formIdx === idx) {
+      dailyLogsCache[idx] = {
+        timestamp: parseInt(document.getElementById('daily-edit-ts').value) || 0,
+        vol: Math.round(parseFloat(document.getElementById('daily-edit-vol').value) || 0),
+        cum: Math.round(parseFloat(document.getElementById('daily-edit-cum').value) || 0),
+        flags: parseInt(document.getElementById('daily-edit-flags').value) || 0
+      };
+      renderDailyLogsTable();
+    }
+    return;
+  }
+
+  const mMonthlyUpd = line.match(/^OK MONTHLY_LOG\[(\d+)\] UPDATED$/);
+  if (mMonthlyUpd) {
+    const idx = parseInt(mMonthlyUpd[1]);
+    log(`Monthly Log [${idx}] successfully updated on device.`, 'log-info');
+    const formIdx = parseInt(document.getElementById('monthly-edit-idx').value);
+    if (formIdx === idx) {
+      monthlyLogsCache[idx] = {
+        timestamp: parseInt(document.getElementById('monthly-edit-ts').value) || 0,
+        vol: Math.round(parseFloat(document.getElementById('monthly-edit-vol').value) || 0)
+      };
+      renderMonthlyLogsTable();
+    }
+    return;
+  }
+
   /* Meter All */
   const mAll = line.match(/VOL=(\S+)\s+FLOW=(\S+)\s+FWD=(\S+)\s+BWD=(\S+)\s+PUMP=(\S+)/);
   if (mAll) {
@@ -633,8 +1415,6 @@ function dispatchLine(line) {
     document.getElementById('s-tx-power').value   = mFloor[5];
     const mMode = line.match(/MODE=(\d+)/);
     if (mMode) document.getElementById('s-mode').value = mMode[1];
-    const mDisp = line.match(/DISP_MODE=(\d+)/);
-    if (mDisp) document.getElementById('s-disp-mode').value = mDisp[1];
     return;
   }
   /* Config line */
@@ -677,6 +1457,276 @@ function dispatchLine(line) {
   if (line === 'CALIB=OFF' || line.startsWith('OK CALIB=OFF')) {
     calibActive = false; updateCalibUI(); return;
   }
+/* MAX35103 registers */
+  if (line.startsWith('MAX35103_REGS=')) {
+    const vals = line.substring(14).split(',');
+    if (vals.length === 12) {
+      for (let i = 0; i < 12; i++) {
+        const addr = (0x38 + i).toString(16).toUpperCase();
+        const inputEl = document.getElementById(`reg-val-${addr}`);
+        if (inputEl) {
+          inputEl.value = vals[i];
+        }
+      }
+      if (window.decodeRegistersToForm) window.decodeRegistersToForm(vals);
+    }
+    return;
+  }
+  const mRawReg = line.match(/^RAW_REG\[([0-9A-Fa-f]+)\]=([0-9A-Fa-f]+)$/);
+  if (mRawReg) {
+    const addrStr = mRawReg[1].toUpperCase();
+    const valStr = mRawReg[2].toUpperCase();
+    const inputEl = document.getElementById(`reg-val-${addrStr}`);
+    if (inputEl) {
+      inputEl.value = valStr;
+    }
+    const addrInt = parseInt(addrStr, 16);
+    if (addrInt >= 0x38 && addrInt <= 0x43) {
+      if (window.updateRegisterCache) window.updateRegisterCache();
+    }
+    return;
+  }
+
+  /* TOF Diagnostics Status */
+  if (line.startsWith('TOF_DIAG_STATUS=')) {
+    const parts = line.substring(16).split(',');
+    if (parts.length === 3) {
+      const irq = parseInt(parts[0], 16);
+      const wvrup = parseInt(parts[1], 16);
+      const wvrdn = parseInt(parts[2], 16);
+
+      window.currentDiagData = window.currentDiagData || {};
+      window.currentDiagData.irq = parts[0];
+      window.currentDiagData.wvrup = wvrup;
+      window.currentDiagData.wvrdn = wvrdn;
+
+      document.getElementById('diag-last-read').textContent = 'Updated ' + new Date().toLocaleTimeString();
+      document.getElementById('diag-irq-hex').textContent = '0x' + parts[0];
+
+      const bits = {
+        'TO': (irq & (1 << 15)) !== 0,
+        'AF': (irq & (1 << 14)) !== 0,
+        'TOF': (irq & (1 << 12)) !== 0,
+        'TE': (irq & (1 << 11)) !== 0,
+        'LDO': (irq & (1 << 10)) !== 0,
+        'TOF_EVTMG': (irq & (1 << 9)) !== 0,
+        'TEMP_EVTMG': (irq & (1 << 8)) !== 0,
+        'FLASH': (irq & (1 << 7)) !== 0,
+        'CAL': (irq & (1 << 6)) !== 0,
+        'HALT': (irq & (1 << 5)) !== 0,
+        'CSWI': (irq & (1 << 4)) !== 0,
+        'INIT': (irq & (1 << 3)) !== 0,
+        'POR': (irq & (1 << 2)) !== 0
+      };
+
+      for (const [bitName, val] of Object.entries(bits)) {
+        const el = document.getElementById('irq-bit-' + bitName);
+        if (el) {
+          el.className = 'irq-badge';
+          if (val) {
+            if (bitName === 'TO' || bitName === 'POR') {
+              el.classList.add('active-red');
+            } else if (bitName === 'AF' || bitName === 'LDO') {
+              el.classList.add('active-warn');
+            } else {
+              el.classList.add('active-green');
+            }
+          }
+        }
+      }
+
+      const decodeRatio = (val) => {
+        const t1_t2 = ((val >> 8) & 0xFF) / 128.0;
+        const t2_tideal = (val & 0xFF) / 128.0;
+        return { t1_t2, t2_tideal };
+      };
+
+      const upRatios = decodeRatio(wvrup);
+      const dnRatios = decodeRatio(wvrdn);
+
+      const updateRatioEl = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.textContent = val.toFixed(4);
+          el.className = 'ratio-val';
+          if (val > 1.9) {
+            el.classList.add('highlight-danger');
+          } else if (val > 1.7) {
+            el.classList.add('highlight-warn');
+          }
+        }
+      };
+
+      updateRatioEl('ratio-up-t1t2', upRatios.t1_t2);
+      updateRatioEl('ratio-up-t2ideal', upRatios.t2_tideal);
+      updateRatioEl('ratio-dn-t1t2', dnRatios.t1_t2);
+      updateRatioEl('ratio-dn-t2ideal', dnRatios.t2_tideal);
+    }
+    return;
+  }
+
+  /* TOF Diagnostics Averages */
+  if (line.startsWith('TOF_DIAG_AVG=')) {
+    const parts = line.substring(13).split(',');
+    if (parts.length === 4) {
+      const upHex = parts[0];
+      const dnHex = parts[1];
+      const diffHex = parts[2];
+      const diffAvgHex = parts[3];
+
+      const u32_up = parseInt(upHex, 16);
+      const u32_dn = parseInt(dnHex, 16);
+      const s32_diff = hexToSigned32(diffHex);
+      const s32_diff_avg = hexToSigned32(diffAvgHex);
+
+      window.currentDiagData = window.currentDiagData || {};
+      window.currentDiagData.up_avg = u32_up / 262144.0;
+      window.currentDiagData.dn_avg = u32_dn / 262144.0;
+      window.currentDiagData.diff = s32_diff / 262144.0;
+      window.currentDiagData.diff_avg = s32_diff_avg / 262144.0;
+
+      document.getElementById('avg-up-hex').textContent = '0x' + upHex;
+      document.getElementById('avg-up-dec').textContent = u32_up;
+      const upUs = u32_up / 262144.0;
+      document.getElementById('avg-up-us').textContent = upUs.toFixed(6);
+
+      document.getElementById('avg-dn-hex').textContent = '0x' + dnHex;
+      document.getElementById('avg-dn-dec').textContent = u32_dn;
+      const dnUs = u32_dn / 262144.0;
+      document.getElementById('avg-dn-us').textContent = dnUs.toFixed(6);
+
+      document.getElementById('diff-hex').textContent = '0x' + diffHex;
+      document.getElementById('diff-dec').textContent = s32_diff;
+      const diffUs = s32_diff / 262144.0;
+      document.getElementById('diff-us').textContent = diffUs.toFixed(6);
+
+      document.getElementById('diff-avg-hex').textContent = '0x' + diffAvgHex;
+      document.getElementById('diff-avg-dec').textContent = s32_diff_avg;
+      const diffAvgUs = s32_diff_avg / 262144.0;
+      document.getElementById('diff-avg-us').textContent = diffAvgUs.toFixed(6);
+
+      // Raw hits comparison table extra rows
+      const elUpHexAvg = document.getElementById('hit-up-hex-avg');
+      const elUpUsAvg = document.getElementById('hit-up-us-avg');
+      const elDnHexAvg = document.getElementById('hit-dn-hex-avg');
+      const elDnUsAvg = document.getElementById('hit-dn-us-avg');
+      const elDeltaAvg = document.getElementById('hit-delta-ns-avg');
+
+      if (elUpHexAvg) elUpHexAvg.textContent = '0x' + upHex;
+      if (elUpUsAvg) elUpUsAvg.textContent = upUs.toFixed(6);
+      if (elDnHexAvg) elDnHexAvg.textContent = '0x' + dnHex;
+      if (elDnUsAvg) elDnUsAvg.textContent = dnUs.toFixed(6);
+
+      const deltaAvgNs = (upUs - dnUs) * 1000.0;
+      if (elDeltaAvg) {
+        elDeltaAvg.textContent = (deltaAvgNs >= 0 ? '+' : '') + deltaAvgNs.toFixed(2);
+        elDeltaAvg.style.color = deltaAvgNs === 0 ? 'var(--text-dim)' : (Math.abs(deltaAvgNs) > 500 ? 'var(--danger)' : 'var(--ok)');
+      }
+
+      const elHexDiff = document.getElementById('hit-up-hex-diff');
+      const elDeltaDiff = document.getElementById('hit-delta-ns-diff');
+      if (elHexDiff) elHexDiff.textContent = '0x' + diffHex;
+      if (elDeltaDiff) {
+        const diffNs = diffUs * 1000.0;
+        elDeltaDiff.textContent = (diffNs >= 0 ? '+' : '') + diffNs.toFixed(2);
+        elDeltaDiff.style.color = diffNs === 0 ? 'var(--text-dim)' : (Math.abs(diffNs) > 500 ? 'var(--danger)' : 'var(--warn)');
+      }
+
+      const elHexDiffAvg = document.getElementById('hit-up-hex-diffavg');
+      const elDeltaDiffAvg = document.getElementById('hit-delta-ns-diffavg');
+      if (elHexDiffAvg) elHexDiffAvg.textContent = '0x' + diffAvgHex;
+      if (elDeltaDiffAvg) {
+        const diffAvgNs = diffAvgUs * 1000.0;
+        elDeltaDiffAvg.textContent = (diffAvgNs >= 0 ? '+' : '') + diffAvgNs.toFixed(2);
+        elDeltaDiffAvg.style.color = diffAvgNs === 0 ? 'var(--text-dim)' : (Math.abs(diffAvgNs) > 500 ? 'var(--danger)' : 'var(--warn)');
+      }
+    }
+    return;
+  }
+
+  /* TOF Diagnostics Raw Hits Upstream */
+  if (line.startsWith('TOF_DIAG_HITS_UP=')) {
+    const parts = line.substring(17).split(',');
+    if (parts.length === 6) {
+      window.diagHitsUp = parts;
+      updateHitsTable();
+    }
+    return;
+  }
+
+  /* TOF Diagnostics Raw Hits Downstream */
+  if (line.startsWith('TOF_DIAG_HITS_DN=')) {
+    const parts = line.substring(17).split(',');
+    if (parts.length === 6) {
+      window.diagHitsDn = parts;
+      updateHitsTable();
+    }
+    return;
+  }
+
+  /* TOF Diagnostics Meter Flow & Flags */
+  if (line.startsWith('TOF_DIAG_METER=')) {
+    const parts = line.substring(15).split(',');
+    if (parts.length === 3) {
+      const flowLph = parseFloat(parts[0]);
+      const pipeEmpty = parseInt(parts[1]) !== 0;
+      const errFlag = parseInt(parts[2]) !== 0;
+
+      document.getElementById('diag-flow-rate').textContent = flowLph.toFixed(2) + ' L/h';
+      document.getElementById('diag-flow-rate-lpm').textContent = (flowLph / 60.0).toFixed(4) + ' L/min';
+      
+      const elEmpty = document.getElementById('diag-pipe-empty');
+      if (elEmpty) {
+        elEmpty.className = pipeEmpty ? 'value flag-bad' : 'value flag-good';
+        elEmpty.textContent = pipeEmpty ? 'EMPTY PIPE' : 'WATER DETECTED';
+        elEmpty.style.fontSize = '16px';
+        elEmpty.style.display = 'inline-block';
+        elEmpty.style.marginTop = '8px';
+      }
+      
+      const elErr = document.getElementById('diag-error-flag');
+      if (elErr) {
+        elErr.className = errFlag ? 'value flag-bad' : 'value flag-good';
+        elErr.textContent = errFlag ? 'FLOW OVERLIMIT' : 'SYSTEM OK';
+        elErr.style.fontSize = '16px';
+        elErr.style.display = 'inline-block';
+        elErr.style.marginTop = '8px';
+      }
+
+      window.currentDiagData = window.currentDiagData || {};
+      window.currentDiagData.flow_lph = flowLph;
+      window.currentDiagData.pipe_empty = pipeEmpty;
+      window.currentDiagData.error_flag = errFlag;
+
+      if (window.addDiagLogEntry) {
+        window.addDiagLogEntry(window.currentDiagData);
+      }
+    }
+    return;
+  }
+
+  /* TOF Diagnostics Estimated Fluid Properties */
+  if (line.startsWith('TOF_DIAG_EST=')) {
+    const parts = line.substring(13).split(',');
+    if (parts.length === 3) {
+      const sos = parseFloat(parts[0]);
+      const wt = parseFloat(parts[1]);
+      const tdelay = parseFloat(parts[2]);
+
+      const elSos = document.getElementById('est-sos');
+      if (elSos) elSos.textContent = isNaN(sos) || sos === 0 ? '—' : sos.toFixed(2);
+      
+      const elWt = document.getElementById('est-wt');
+      if (elWt) elWt.textContent = isNaN(wt) || wt === 0 ? '—' : wt.toFixed(1);
+
+      const elDelayInput = document.getElementById('c-est-tdelay');
+      if (elDelayInput && document.activeElement !== elDelayInput) {
+        elDelayInput.value = tdelay.toFixed(3);
+      }
+    }
+    return;
+  }
+
 }
 
 /* ─── Send ─────────────────────────────────────────────────────────────────*/
@@ -722,6 +1772,11 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'max35103-regs' && connected) {
+      send('GET_MAX35103_REGS');
+    } else if (btn.dataset.tab === 'tof-diag' && connected) {
+      send('GET_TOF_DIAG');
+    }
   });
 });
 
@@ -729,19 +1784,24 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 const ACTION_BTNS = [
   'btn-read-meter','btn-auto-refresh','btn-read-status',
   'btn-write-floor-id','btn-write-group-id','btn-write-interval',
-  'btn-write-phy','btn-write-tx','btn-write-mode','btn-write-disp-mode',
+  'btn-write-phy','btn-write-tx','btn-write-mode',
   'btn-get-time','btn-set-time','btn-reset-device',
   'btn-read-cfg',
   'btn-calib-unlock','btn-calib-lock',
   'btn-read-table','btn-write-table-all',
   'btn-read-vol','btn-write-vol',
-  'btn-term-send','term-input'
+  'btn-term-send','term-input',
+  'btn-read-diag','btn-auto-diag',
+  'btn-write-est-tdelay',
+  'btn-read-daily-logs', 'btn-read-monthly-logs',
+  'btn-write-daily-log', 'btn-write-monthly-log'
 ];
 function enableControls(on) {
   ACTION_BTNS.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.disabled = !on;
   });
+  if (window.updateLogsUI) window.updateLogsUI();
   if (!on) {
     /* calib write buttons always off when disconnected */
     ['btn-write-sos','btn-write-radius','btn-write-length',
@@ -757,6 +1817,7 @@ function enableControls(on) {
     if (rcfg) rcfg.disabled = false;
     updateCalibWriteButtons();
   }
+  if (window.updateRegsUI) window.updateRegsUI();
 }
 
 function updateCalibWriteButtons() {
@@ -781,6 +1842,8 @@ function updateCalibUI() {
   const notice = document.getElementById('table-lock-notice');
   if (notice) notice.style.display = (!calibActive && connected) ? '' : 'none';
   updateCalibWriteButtons();
+  if (window.updateRegsUI) window.updateRegsUI();
+  if (window.updateLogsUI) window.updateLogsUI();
 }
 
 /* ─── Auto refresh ──────────────────────────────────────────────────────────*/
@@ -847,11 +1910,6 @@ document.getElementById('btn-write-mode').addEventListener('click', async () => 
   const label = v === '0' ? 'STORAGE (mesh inactive)' : 'NORMAL (mesh active)';
   if (!confirm(`Set mode to ${label}?`)) return;
   await send(`SET_MODE=${v}`);
-});
-
-document.getElementById('btn-write-disp-mode').addEventListener('click', async () => {
-  const v = document.getElementById('s-disp-mode').value;
-  await send(`SET_DISP_MODE=${v}`);
 });
 
 /* ─── IST formatter ─────────────────────────────────────────────────────────*/
@@ -1010,6 +2068,807 @@ document.querySelectorAll('.quick-cmd').forEach(a => {
     });
   });
 });
+
+/* ─── MAX35103 Registers ───────────────────────────────────────────────────*/
+const MAX35103_REG_INFO = [
+  { addr: '38', name: 'TOF1', desc: 'ToF Configuration 1' },
+  { addr: '39', name: 'TOF2', desc: 'ToF Configuration 2' },
+  { addr: '3A', name: 'TOF3', desc: 'ToF Configuration 3' },
+  { addr: '3B', name: 'TOF4', desc: 'ToF Configuration 4' },
+  { addr: '3C', name: 'TOF5', desc: 'ToF Configuration 5' },
+  { addr: '3D', name: 'TOF6', desc: 'ToF Configuration 6 (Comp Offset 1)' },
+  { addr: '3E', name: 'TOF7', desc: 'ToF Configuration 7 (Comp Offset 2)' },
+  { addr: '3F', name: 'EVTMG1', desc: 'Event Timing 1' },
+  { addr: '40', name: 'EVTMG2', desc: 'Event Timing 2' },
+  { addr: '41', name: 'TOF_MEAS_DELAY', desc: 'ToF Measurement Delay' },
+  { addr: '42', name: 'CALIB_CTRL', desc: 'Calibration/Control' },
+  { addr: '43', name: 'CRYSTAL', desc: 'Crystal Config' }
+];
+
+const regsTableBody = document.getElementById('raw-regs-body');
+MAX35103_REG_INFO.forEach(r => {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td>0x${r.addr}</td>
+    <td><strong>${r.name}</strong><br><span style="font-size:11px;color:var(--text-dim)">${r.desc}</span></td>
+    <td><input type="text" id="reg-val-${r.addr}" class="reg-hex-input" style="width:100px;font-family:monospace;text-align:center" maxlength="4" placeholder="0000" disabled></td>
+    <td>
+      <div class="btn-row" style="margin:0;gap:4px">
+        <button class="btn btn-ghost btn-sm btn-reg-read" id="btn-read-reg-${r.addr}" data-addr="${r.addr}" style="padding:4px 8px;font-size:11px" disabled>Read</button>
+        <button class="btn btn-ghost btn-sm btn-reg-write" id="btn-write-reg-${r.addr}" data-addr="${r.addr}" style="padding:4px 8px;font-size:11px" disabled>Write</button>
+      </div>
+    </td>
+  `;
+  regsTableBody.appendChild(tr);
+});
+
+// Setup click event listeners on newly generated elements
+document.querySelectorAll('.btn-reg-read').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const addr = btn.dataset.addr;
+    send(`GET_RAW_REG=${addr}`);
+  });
+});
+
+document.querySelectorAll('.btn-reg-write').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const addr = btn.dataset.addr;
+    const val = document.getElementById(`reg-val-${addr}`).value.trim();
+    if (!/^[0-9A-Fa-f]{4}$/.test(val)) {
+      alert('Please enter a valid 4-character hex value (e.g. 1311).');
+      return;
+    }
+    send(`SET_RAW_REG=${addr},${val}`);
+  });
+});
+
+document.getElementById('btn-read-regs-all').addEventListener('click', () => {
+  send('GET_MAX35103_REGS');
+});
+
+document.getElementById('btn-write-regs-all').addEventListener('click', async () => {
+  if (!calibActive) { alert('Enable Calibration Mode first.'); return; }
+  if (!confirm('Write all 12 registers to device NVM?')) return;
+  const vals = [];
+  for (let i = 0; i < 12; i++) {
+    const addr = (0x38 + i).toString(16).toUpperCase();
+    const val = document.getElementById(`reg-val-${addr}`).value.trim();
+    if (!/^[0-9A-Fa-f]{4}$/.test(val)) {
+      alert(`Register 0x${addr} has an invalid hex value.`);
+      return;
+    }
+    vals.push(val);
+  }
+  await send(`SET_MAX35103_REGS=${vals.join(',')}`);
+});
+
+document.getElementById('btn-write-params').addEventListener('click', async () => {
+  if (!calibActive) { alert('Enable Calibration Mode first.'); return; }
+  if (!confirm('Apply configured parameters to device?')) return;
+  const vals = encodeFormToRegisters();
+  await send(`SET_MAX35103_REGS=${vals.join(',')}`);
+});
+
+document.getElementById('f-delay').addEventListener('input', (e) => {
+  const dly = parseInt(e.target.value) || 0;
+  document.getElementById('f-delay-us').textContent = (dly * 0.25).toFixed(2) + ' µs (DLY × 250ns)';
+});
+
+window.decodeRegistersToForm = function(vals) {
+  const reg38 = parseInt(vals[0], 16);
+  document.getElementById('f-pl').value = reg38 & 0xFF;
+  document.getElementById('f-dpl').value = (reg38 >> 8) & 0x0F;
+  document.getElementById('f-ct').value = (reg38 >> 12) & 0x0F;
+
+  const reg39 = parseInt(vals[1], 16);
+  document.getElementById('f-timout').value = reg39 & 0x07;
+  document.getElementById('f-tof-cyc').value = (reg39 >> 4) & 0x07;
+  document.getElementById('f-t2wv').value = (reg39 >> 7) & 0x3F;
+  document.getElementById('f-stop').value = (reg39 >> 13) & 0x07;
+
+  const reg3A = parseInt(vals[2], 16);
+  document.getElementById('f-hit1wv').value = reg3A & 0x3F;
+  document.getElementById('f-hit2wv').value = (reg3A >> 8) & 0x3F;
+
+  const reg3B = parseInt(vals[3], 16);
+  document.getElementById('f-hit3wv').value = reg3B & 0x3F;
+  document.getElementById('f-hit4wv').value = (reg3B >> 8) & 0x3F;
+
+  const reg3C = parseInt(vals[4], 16);
+  document.getElementById('f-hit5wv').value = reg3C & 0x3F;
+  document.getElementById('f-hit6wv').value = (reg3C >> 8) & 0x3F;
+
+  document.getElementById('f-tof6').value = vals[5];
+  document.getElementById('f-tof7').value = vals[6];
+  document.getElementById('f-evtmg1').value = vals[7];
+  document.getElementById('f-evtmg2').value = vals[8];
+
+  const reg41 = parseInt(vals[9], 16);
+  document.getElementById('f-delay').value = reg41;
+  document.getElementById('f-delay-us').textContent = (reg41 * 0.25).toFixed(2) + ' µs (DLY × 250ns)';
+
+  document.getElementById('f-calib-ctrl').value = vals[10];
+  document.getElementById('f-crystal').value = vals[11];
+};
+
+window.updateRegisterCache = function() {
+  const vals = [];
+  for (let i = 0; i < 12; i++) {
+    const a = (0x38 + i).toString(16).toUpperCase();
+    const inputEl = document.getElementById(`reg-val-${a}`);
+    vals.push(inputEl ? inputEl.value : '0000');
+  }
+  window.decodeRegistersToForm(vals);
+};
+
+function encodeFormToRegisters() {
+  const pl = parseInt(document.getElementById('f-pl').value) || 0;
+  const dpl = parseInt(document.getElementById('f-dpl').value) || 0;
+  const ct = parseInt(document.getElementById('f-ct').value) || 0;
+  const reg38 = ((ct & 0x0F) << 12) | ((dpl & 0x0F) << 8) | (pl & 0xFF);
+
+  const timout = parseInt(document.getElementById('f-timout').value) || 0;
+  const tof_cyc = parseInt(document.getElementById('f-tof-cyc').value) || 0;
+  const t2wv = parseInt(document.getElementById('f-t2wv').value) || 0;
+  const stop = parseInt(document.getElementById('f-stop').value) || 0;
+  const reg39 = ((stop & 0x07) << 13) | ((t2wv & 0x3F) << 7) | ((tof_cyc & 0x07) << 4) | (timout & 0x07);
+
+  const hit1wv = parseInt(document.getElementById('f-hit1wv').value) || 0;
+  const hit2wv = parseInt(document.getElementById('f-hit2wv').value) || 0;
+  const reg3A = ((hit2wv & 0x3F) << 8) | (hit1wv & 0x3F);
+
+  const hit3wv = parseInt(document.getElementById('f-hit3wv').value) || 0;
+  const hit4wv = parseInt(document.getElementById('f-hit4wv').value) || 0;
+  const reg3B = ((hit4wv & 0x3F) << 8) | (hit3wv & 0x3F);
+
+  const hit5wv = parseInt(document.getElementById('f-hit5wv').value) || 0;
+  const hit6wv = parseInt(document.getElementById('f-hit6wv').value) || 0;
+  const reg3C = ((hit6wv & 0x3F) << 8) | (hit5wv & 0x3F);
+
+  const reg3D = parseInt(document.getElementById('f-tof6').value, 16) || 0;
+  const reg3E = parseInt(document.getElementById('f-tof7').value, 16) || 0;
+  const reg3F = parseInt(document.getElementById('f-evtmg1').value, 16) || 0;
+  const reg40 = parseInt(document.getElementById('f-evtmg2').value, 16) || 0;
+
+  const delay = parseInt(document.getElementById('f-delay').value) || 0;
+  const reg41 = delay & 0xFFFF;
+
+  const calib_ctrl = parseInt(document.getElementById('f-calib-ctrl').value, 16) || 0;
+  const crystal = parseInt(document.getElementById('f-crystal').value, 16) || 0;
+
+  const toHex = (val) => (isNaN(val) ? 0 : val).toString(16).toUpperCase().padStart(4, '0');
+
+  return [
+    toHex(reg38), toHex(reg39), toHex(reg3A), toHex(reg3B),
+    toHex(reg3C), toHex(reg3D), toHex(reg3E), toHex(reg3F),
+    toHex(reg40), toHex(reg41), toHex(calib_ctrl), toHex(crystal)
+  ];
+}
+
+window.updateRegsUI = function() {
+  const isConnected = connected;
+  const isCalib = connected && calibActive;
+  console.log(`[updateRegsUI] connected=${isConnected}, calibActive=${calibActive}, isCalib=${isCalib}`);
+
+  const lockEl = document.getElementById('max-regs-lock');
+  if (lockEl) lockEl.style.display = isCalib ? 'none' : (isConnected ? '' : 'none');
+  
+  const warnEl = document.getElementById('regs-calib-warn');
+  if (warnEl) warnEl.style.display = isCalib ? '' : 'none';
+
+  const readAllBtn = document.getElementById('btn-read-regs-all');
+  if (readAllBtn) readAllBtn.disabled = !isConnected;
+  
+  document.querySelectorAll('.btn-reg-read').forEach(b => b.disabled = !isConnected);
+
+  const writeParamsBtn = document.getElementById('btn-write-params');
+  if (writeParamsBtn) writeParamsBtn.disabled = !isCalib;
+  
+  const writeRegsAllBtn = document.getElementById('btn-write-regs-all');
+  if (writeRegsAllBtn) writeRegsAllBtn.disabled = !isCalib;
+  
+  document.querySelectorAll('.btn-reg-write').forEach(b => b.disabled = !isCalib);
+
+  const inputs = [
+    'f-ct', 'f-dpl', 'f-pl', 'f-stop', 'f-t2wv', 'f-tof-cyc', 'f-timout',
+    'f-hit1wv', 'f-hit2wv', 'f-hit3wv', 'f-hit4wv', 'f-hit5wv', 'f-hit6wv',
+    'f-tof6', 'f-tof7', 'f-delay', 'f-evtmg1', 'f-evtmg2', 'f-calib-ctrl', 'f-crystal'
+  ];
+  inputs.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = !isCalib;
+  });
+
+  MAX35103_REG_INFO.forEach(r => {
+    const el = document.getElementById(`reg-val-${r.addr}`);
+    if (el) el.disabled = !isCalib;
+  });
+};
+
+/* ─── TOF Diagnostics ────────────────────────────────────────────────────── */
+function hexToSigned32(hexStr) {
+  let val = parseInt(hexStr, 16);
+  if ((val & 0x80000000) !== 0) {
+    val = val - 0x100000000;
+  }
+  return val;
+}
+
+window.diagHitsUp = null;
+window.diagHitsDn = null;
+
+function updateHitsTable() {
+  if (!window.diagHitsUp || !window.diagHitsDn) return;
+  window.currentDiagData = window.currentDiagData || {};
+  window.currentDiagData.hit_deltas = window.currentDiagData.hit_deltas || [];
+  for (let i = 0; i < 6; i++) {
+    const upHex = window.diagHitsUp[i];
+    const dnHex = window.diagHitsDn[i];
+
+    const upVal = parseInt(upHex, 16);
+    const dnVal = parseInt(dnHex, 16);
+
+    const upUs = upVal / 262144.0;
+    const dnUs = dnVal / 262144.0;
+    const deltaNs = (upUs - dnUs) * 1000.0;
+
+    window.currentDiagData.hit_deltas[i] = deltaNs;
+    if (i === 0) {
+      window.currentDiagData.hit_delta_0 = deltaNs;
+    }
+
+    const elUpHex = document.getElementById(`hit-up-hex-${i}`);
+    const elUpUs = document.getElementById(`hit-up-us-${i}`);
+    const elDnHex = document.getElementById(`hit-dn-hex-${i}`);
+    const elDnUs = document.getElementById(`hit-dn-us-${i}`);
+    const elDelta = document.getElementById(`hit-delta-ns-${i}`);
+
+    if (elUpHex) elUpHex.textContent = '0x' + upHex;
+    if (elUpUs) elUpUs.textContent = upUs.toFixed(6);
+    if (elDnHex) elDnHex.textContent = '0x' + dnHex;
+    if (elDnUs) elDnUs.textContent = dnUs.toFixed(6);
+    if (elDelta) {
+      elDelta.textContent = (deltaNs >= 0 ? '+' : '') + deltaNs.toFixed(2);
+      elDelta.style.color = deltaNs === 0 ? 'var(--text-dim)' : (Math.abs(deltaNs) > 500 ? 'var(--danger)' : 'var(--text)');
+    }
+  }
+}
+
+let autoDiagOn = false;
+let autoDiagTimer = null;
+
+document.getElementById('btn-read-diag').addEventListener('click', () => send('GET_TOF_DIAG'));
+
+document.getElementById('btn-write-est-tdelay').addEventListener('click', async () => {
+  const el = document.getElementById('c-est-tdelay');
+  if (!el) return;
+  const val = parseFloat(el.value);
+  if (isNaN(val) || val < 0 || val > 50) {
+    alert('Please enter a valid transducer delay (0 to 50 microseconds).');
+    return;
+  }
+  await send(`SET_EST_TDELAY=${val.toFixed(3)}`);
+});
+
+document.getElementById('btn-auto-diag').addEventListener('click', () => {
+  autoDiagOn = !autoDiagOn;
+  const btn = document.getElementById('btn-auto-diag');
+  btn.textContent = autoDiagOn ? 'Stop Auto' : 'Auto Read (2s)';
+  btn.className = autoDiagOn ? 'btn btn-warn' : 'btn btn-ghost';
+  if (autoDiagOn) {
+    autoDiagTimer = setInterval(() => {
+      if (connected) send('GET_TOF_DIAG');
+    }, 2000);
+    send('GET_TOF_DIAG');
+  } else {
+    stopDiagAuto();
+  }
+});
+
+function stopDiagAuto() {
+  autoDiagOn = false;
+  clearInterval(autoDiagTimer);
+  const btn = document.getElementById('btn-auto-diag');
+  if (btn) {
+    btn.textContent = 'Auto Read (2s)';
+    btn.className = 'btn btn-ghost';
+  }
+}
+
+/* ─── TOF Diagnostics Logging and Export ─────────────────────────────────── */
+window.currentDiagData = {
+  irq: null,
+  wvrup: null,
+  wvrdn: null,
+  up_avg: null,
+  dn_avg: null,
+  diff: null,
+  diff_avg: null,
+  hit_delta_0: null,
+  hit_deltas: [null, null, null, null, null, null],
+  flow_lph: null,
+  pipe_empty: null,
+  error_flag: null
+};
+
+window.diagLogs = [];
+
+window.addDiagLogEntry = function(data) {
+  const timestamp = new Date().toLocaleTimeString();
+  const dateStr = new Date().toISOString().split('T')[0] + ' ' + timestamp;
+
+  // Decode ratios
+  const decodeRatio = (val) => {
+    if (val === null || val === undefined) return '—';
+    const t1_t2 = ((val >> 8) & 0xFF) / 128.0;
+    const t2_tideal = (val & 0xFF) / 128.0;
+    return `${t1_t2.toFixed(3)} / ${t2_tideal.toFixed(3)}`;
+  };
+
+  const upRatioStr = decodeRatio(data.wvrup);
+  const dnRatioStr = decodeRatio(data.wvrdn);
+
+  const avgDelta = (data.up_avg !== null && data.dn_avg !== null) ? (data.up_avg - data.dn_avg) * 1000.0 : null;
+  const tofDiff = data.diff !== null && data.diff !== undefined ? data.diff * 1000.0 : null;
+  const tofDiffAvg = data.diff_avg !== null && data.diff_avg !== undefined ? data.diff_avg * 1000.0 : null;
+
+  const logItem = {
+    timestamp: dateStr,
+    flow_lph: data.flow_lph,
+    pipe_empty: data.pipe_empty,
+    error_flag: data.error_flag,
+    irq: data.irq,
+    wvrup: upRatioStr,
+    wvrdn: dnRatioStr,
+    up_avg: data.up_avg,
+    dn_avg: data.dn_avg,
+    avg_delta: avgDelta,
+    tof_diff: tofDiff,
+    tof_diff_avg: tofDiffAvg,
+    hit_deltas: data.hit_deltas ? [...data.hit_deltas] : [null, null, null, null, null, null]
+  };
+
+  window.diagLogs.push(logItem);
+
+  const tbody = document.getElementById('diag-log-body');
+  if (tbody) {
+    const tr = document.createElement('tr');
+
+    let rowClass = '';
+    if (data.pipe_empty) {
+      rowClass = 'row-danger';
+    } else if (data.error_flag) {
+      rowClass = 'row-warn';
+    } else {
+      const decodeRatioVals = (val) => {
+        if (val === null || val === undefined) return { t1_t2: 0, t2_tideal: 0 };
+        return {
+          t1_t2: ((val >> 8) & 0xFF) / 128.0,
+          t2_tideal: (val & 0xFF) / 128.0
+        };
+      };
+      const upVals = decodeRatioVals(data.wvrup);
+      const dnVals = decodeRatioVals(data.wvrdn);
+      if (upVals.t1_t2 > 1.9 || upVals.t2_tideal > 1.9 || dnVals.t1_t2 > 1.9 || dnVals.t2_tideal > 1.9) {
+        rowClass = 'row-danger';
+      } else if (upVals.t1_t2 > 1.7 || upVals.t2_tideal > 1.7 || dnVals.t1_t2 > 1.7 || dnVals.t2_tideal > 1.7) {
+        rowClass = 'row-warn';
+      }
+    }
+
+    if (rowClass) tr.className = rowClass;
+
+    const tdTimestamp = `<td>${timestamp}</td>`;
+    const tdFlow = `<td style="color:var(--accent); font-weight:bold;">${data.flow_lph !== null && data.flow_lph !== undefined ? data.flow_lph.toFixed(2) : '—'}</td>`;
+
+    const pipeStr = data.pipe_empty ? '<span class="status-badge-inline flag-bad">EMPTY</span>' : '<span class="status-badge-inline flag-good">OK</span>';
+    const tdPipe = `<td>${pipeStr}</td>`;
+
+    const errStr = data.error_flag ? '<span class="status-badge-inline flag-bad">ERROR</span>' : '<span class="status-badge-inline flag-good">OK</span>';
+    const tdErr = `<td>${errStr}</td>`;
+
+    const tdIrq = `<td>0x${data.irq || '0000'}</td>`;
+    const tdWvrup = `<td>${upRatioStr}</td>`;
+    const tdWvrdn = `<td>${dnRatioStr}</td>`;
+    const tdAvgUp = `<td>${data.up_avg !== null && data.up_avg !== undefined ? data.up_avg.toFixed(4) : '—'}</td>`;
+    const tdAvgDn = `<td>${data.dn_avg !== null && data.dn_avg !== undefined ? data.dn_avg.toFixed(4) : '—'}</td>`;
+    
+    const tdAvgDelta = `<td style="font-weight:bold; color:var(--ok);">${avgDelta !== null ? (avgDelta >= 0 ? '+' : '') + avgDelta.toFixed(2) : '—'}</td>`;
+    const tdTDiff = `<td style="font-weight:bold; color:var(--warn);">${tofDiff !== null ? (tofDiff >= 0 ? '+' : '') + tofDiff.toFixed(2) : '—'}</td>`;
+    const tdTDiffAvg = `<td style="font-weight:bold; color:var(--warn);">${tofDiffAvg !== null ? (tofDiffAvg >= 0 ? '+' : '') + tofDiffAvg.toFixed(2) : '—'}</td>`;
+
+    let tdHitsStr = '';
+    for (let i = 0; i < 6; i++) {
+      const hDelta = data.hit_deltas && data.hit_deltas[i] !== undefined ? data.hit_deltas[i] : null;
+      let hColor = '';
+      if (hDelta !== null) {
+        hColor = Math.abs(hDelta) > 500 ? 'color:var(--danger);' : (hDelta === 0 ? 'color:var(--text-dim);' : '');
+      }
+      tdHitsStr += `<td style="font-weight:bold; ${hColor}">${hDelta !== null ? (hDelta >= 0 ? '+' : '') + hDelta.toFixed(2) : '—'}</td>`;
+    }
+
+    tr.innerHTML = tdTimestamp + tdFlow + tdPipe + tdErr + tdIrq + tdWvrup + tdWvrdn + tdAvgUp + tdAvgDn + tdAvgDelta + tdTDiff + tdTDiffAvg + tdHitsStr;
+
+    if (tbody.firstChild) {
+      tbody.insertBefore(tr, tbody.firstChild);
+    } else {
+      tbody.appendChild(tr);
+    }
+
+    while (tbody.children.length > 500) {
+      tbody.removeChild(tbody.lastChild);
+    }
+  }
+};
+
+function exportDiagLogToCSV() {
+  if (window.diagLogs.length === 0) {
+    alert("No diagnostic log data available to export.");
+    return;
+  }
+
+  const headers = [
+    "Timestamp",
+    "Flow Rate (L/h)",
+    "Pipe Status",
+    "System Error Status",
+    "IRQ Status (0xFE)",
+    "WVRUP Ratios (t1_t2 / t2_tideal)",
+    "WVRDN Ratios (t1_t2 / t2_tideal)",
+    "Up Average (us)",
+    "Down Average (us)",
+    "AVG Delta (ns)",
+    "TOF_DIFF (ns)",
+    "TOF_DIFF_AVG (ns)",
+    "Hit 1 Delta (ns)",
+    "Hit 2 Delta (ns)",
+    "Hit 3 Delta (ns)",
+    "Hit 4 Delta (ns)",
+    "Hit 5 Delta (ns)",
+    "Hit 6 Delta (ns)"
+  ];
+
+  let csvContent = "data:text/csv;charset=utf-8,";
+  csvContent += headers.map(h => `"${h}"`).join(",") + "\n";
+
+  window.diagLogs.forEach(log => {
+    const row = [
+      log.timestamp,
+      log.flow_lph !== null && log.flow_lph !== undefined ? log.flow_lph.toFixed(4) : "",
+      log.pipe_empty ? "EMPTY" : "OK",
+      log.error_flag ? "ERROR" : "OK",
+      log.irq ? `0x${log.irq}` : "",
+      log.wvrup,
+      log.wvrdn,
+      log.up_avg !== null && log.up_avg !== undefined ? log.up_avg.toFixed(6) : "",
+      log.dn_avg !== null && log.dn_avg !== undefined ? log.dn_avg.toFixed(6) : "",
+      log.avg_delta !== null && log.avg_delta !== undefined ? log.avg_delta.toFixed(2) : "",
+      log.tof_diff !== null && log.tof_diff !== undefined ? log.tof_diff.toFixed(2) : "",
+      log.tof_diff_avg !== null && log.tof_diff_avg !== undefined ? log.tof_diff_avg.toFixed(2) : "",
+      log.hit_deltas && log.hit_deltas[0] !== null && log.hit_deltas[0] !== undefined ? log.hit_deltas[0].toFixed(2) : "",
+      log.hit_deltas && log.hit_deltas[1] !== null && log.hit_deltas[1] !== undefined ? log.hit_deltas[1].toFixed(2) : "",
+      log.hit_deltas && log.hit_deltas[2] !== null && log.hit_deltas[2] !== undefined ? log.hit_deltas[2].toFixed(2) : "",
+      log.hit_deltas && log.hit_deltas[3] !== null && log.hit_deltas[3] !== undefined ? log.hit_deltas[3].toFixed(2) : "",
+      log.hit_deltas && log.hit_deltas[4] !== null && log.hit_deltas[4] !== undefined ? log.hit_deltas[4].toFixed(2) : "",
+      log.hit_deltas && log.hit_deltas[5] !== null && log.hit_deltas[5] !== undefined ? log.hit_deltas[5].toFixed(2) : ""
+    ];
+    csvContent += row.map(val => `"${val}"`).join(",") + "\n";
+  });
+
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `mira_tof_diagnostics_${new Date().toISOString().split('T')[0]}_${new Date().toLocaleTimeString().replace(/:/g, '-')}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+function clearDiagLogTable() {
+  if (confirm("Are you sure you want to clear the diagnostic log table?")) {
+    window.diagLogs = [];
+    const tbody = document.getElementById('diag-log-body');
+    if (tbody) {
+      tbody.innerHTML = '';
+    }
+  }
+}
+
+document.getElementById('btn-export-log-csv').addEventListener('click', exportDiagLogToCSV);
+document.getElementById('btn-clear-log-table').addEventListener('click', clearDiagLogTable);
+
+
+/* ─── Daily and Monthly Consumption History Logs ────────────────────────── */
+(function buildIndexDropdowns() {
+  const dailySelect = document.getElementById('daily-edit-idx');
+  if (dailySelect) {
+    for (let i = 0; i < 31; i++) {
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = `Day ${i}`;
+      dailySelect.appendChild(opt);
+    }
+  }
+  const monthlySelect = document.getElementById('monthly-edit-idx');
+  if (monthlySelect) {
+    for (let i = 0; i < 12; i++) {
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = `Month ${i}`;
+      monthlySelect.appendChild(opt);
+    }
+  }
+})();
+
+function formatLogDate(timestamp) {
+  if (!timestamp || timestamp === 0 || timestamp === 0xFFFFFFFF) return '—';
+  return new Date(timestamp * 1000).toLocaleDateString('en-IN', {
+    year: 'numeric', month: 'short', day: '2-digit'
+  });
+}
+
+function formatLogMonth(timestamp) {
+  if (!timestamp || timestamp === 0 || timestamp === 0xFFFFFFFF) return '—';
+  return new Date(timestamp * 1000).toLocaleDateString('en-IN', {
+    year: 'numeric', month: 'short'
+  });
+}
+
+window.renderDailyLogsTable = function() {
+  const tbody = document.getElementById('daily-logs-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  for (let i = 0; i < 31; i++) {
+    const log = dailyLogsCache[i];
+    const tr = document.createElement('tr');
+    if (log) {
+      const dateStr = formatLogDate(log.timestamp);
+      const volStr = log.vol;
+      const cumStr = log.cum;
+      const flagsStr = '0x' + log.flags.toString(16).toUpperCase().padStart(4, '0') + ` (${log.flags})`;
+      
+      tr.innerHTML = `
+        <td class="row-idx">${i}</td>
+        <td style="font-family: var(--mono);">${dateStr}</td>
+        <td style="font-family: var(--mono); font-weight: bold; color: var(--accent);">${volStr}</td>
+        <td style="font-family: var(--mono);">${cumStr}</td>
+        <td style="font-family: var(--mono); color: var(--text-dim);">${flagsStr}</td>
+        <td>
+          <button class="btn btn-ghost" style="padding:3px 10px;font-size:11px" onclick="populateDailyEditForm(${i})">Edit</button>
+        </td>
+      `;
+    } else {
+      tr.innerHTML = `
+        <td class="row-idx">${i}</td>
+        <td style="color: var(--text-dim);">—</td>
+        <td style="color: var(--text-dim);">—</td>
+        <td style="color: var(--text-dim);">—</td>
+        <td style="color: var(--text-dim);">—</td>
+        <td>
+          <button class="btn btn-ghost" style="padding:3px 10px;font-size:11px" onclick="populateDailyEditForm(${i})">Edit</button>
+        </td>
+      `;
+    }
+    tbody.appendChild(tr);
+  }
+};
+
+window.renderMonthlyLogsTable = function() {
+  const tbody = document.getElementById('monthly-logs-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  for (let i = 0; i < 12; i++) {
+    const log = monthlyLogsCache[i];
+    const tr = document.createElement('tr');
+    if (log) {
+      const monthStr = formatLogMonth(log.timestamp);
+      const volStr = log.vol;
+      tr.innerHTML = `
+        <td class="row-idx">${i}</td>
+        <td style="font-family: var(--mono);">${monthStr}</td>
+        <td style="font-family: var(--mono); font-weight: bold; color: var(--accent);">${volStr}</td>
+        <td>
+          <button class="btn btn-ghost" style="padding:3px 10px;font-size:11px" onclick="populateMonthlyEditForm(${i})">Edit</button>
+        </td>
+      `;
+    } else {
+      tr.innerHTML = `
+        <td class="row-idx">${i}</td>
+        <td style="color: var(--text-dim);">—</td>
+        <td style="color: var(--text-dim);">—</td>
+        <td>
+          <button class="btn btn-ghost" style="padding:3px 10px;font-size:11px" onclick="populateMonthlyEditForm(${i})">Edit</button>
+        </td>
+      `;
+    }
+    tbody.appendChild(tr);
+  }
+};
+
+window.populateDailyEditForm = function(index) {
+  const log = dailyLogsCache[index];
+  const idxEl = document.getElementById('daily-edit-idx');
+  if (idxEl) idxEl.value = index;
+  
+  const tsEl = document.getElementById('daily-edit-ts');
+  const volEl = document.getElementById('daily-edit-vol');
+  const cumEl = document.getElementById('daily-edit-cum');
+  const flagsEl = document.getElementById('daily-edit-flags');
+  const dateEl = document.getElementById('daily-edit-date');
+
+  if (log) {
+    if (tsEl) tsEl.value = log.timestamp;
+    if (volEl) volEl.value = log.vol;
+    if (cumEl) cumEl.value = log.cum;
+    if (flagsEl) flagsEl.value = log.flags;
+    
+    if (dateEl) {
+      if (log.timestamp && log.timestamp !== 0 && log.timestamp !== 0xFFFFFFFF) {
+        const date = new Date(log.timestamp * 1000);
+        const pad = (n) => n.toString().padStart(2, '0');
+        dateEl.value = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+      } else {
+        dateEl.value = '';
+      }
+    }
+  } else {
+    if (tsEl) tsEl.value = 0;
+    if (volEl) volEl.value = 0;
+    if (cumEl) cumEl.value = 0;
+    if (flagsEl) flagsEl.value = 0;
+    if (dateEl) dateEl.value = '';
+  }
+};
+
+window.populateMonthlyEditForm = function(index) {
+  const log = monthlyLogsCache[index];
+  const idxEl = document.getElementById('monthly-edit-idx');
+  if (idxEl) idxEl.value = index;
+  
+  const tsEl = document.getElementById('monthly-edit-ts');
+  const volEl = document.getElementById('monthly-edit-vol');
+  const dateEl = document.getElementById('monthly-edit-date');
+
+  if (log) {
+    if (tsEl) tsEl.value = log.timestamp;
+    if (volEl) volEl.value = log.vol;
+    
+    if (dateEl) {
+      if (log.timestamp && log.timestamp !== 0 && log.timestamp !== 0xFFFFFFFF) {
+        const date = new Date(log.timestamp * 1000);
+        const pad = (n) => n.toString().padStart(2, '0');
+        dateEl.value = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+      } else {
+        dateEl.value = '';
+      }
+    }
+  } else {
+    if (tsEl) tsEl.value = 0;
+    if (volEl) volEl.value = 0;
+    if (dateEl) dateEl.value = '';
+  }
+};
+
+const dailyDateEl = document.getElementById('daily-edit-date');
+if (dailyDateEl) {
+  dailyDateEl.addEventListener('input', (e) => {
+    const val = e.target.value;
+    const tsEl = document.getElementById('daily-edit-ts');
+    if (val && tsEl) {
+      const epoch = Math.floor(new Date(val).getTime() / 1000);
+      tsEl.value = isNaN(epoch) ? 0 : epoch;
+    }
+  });
+}
+
+const monthlyDateEl = document.getElementById('monthly-edit-date');
+if (monthlyDateEl) {
+  monthlyDateEl.addEventListener('input', (e) => {
+    const val = e.target.value;
+    const tsEl = document.getElementById('monthly-edit-ts');
+    if (val && tsEl) {
+      const epoch = Math.floor(new Date(val).getTime() / 1000);
+      tsEl.value = isNaN(epoch) ? 0 : epoch;
+    }
+  });
+}
+
+const btnReadDaily = document.getElementById('btn-read-daily-logs');
+if (btnReadDaily) {
+  btnReadDaily.addEventListener('click', async () => {
+    dailyLogsCache.fill(null);
+    dailyLogsReadCount = 0;
+    const el = document.getElementById('daily-read-progress');
+    if (el) el.textContent = 'Requesting logs...';
+    renderDailyLogsTable();
+    await send('GET_DAILY_LOGS');
+  });
+}
+
+const btnReadMonthly = document.getElementById('btn-read-monthly-logs');
+if (btnReadMonthly) {
+  btnReadMonthly.addEventListener('click', async () => {
+    monthlyLogsCache.fill(null);
+    monthlyLogsReadCount = 0;
+    const el = document.getElementById('monthly-read-progress');
+    if (el) el.textContent = 'Requesting logs...';
+    renderMonthlyLogsTable();
+    await send('GET_MONTHLY_LOGS');
+  });
+}
+
+const btnWriteDaily = document.getElementById('btn-write-daily-log');
+if (btnWriteDaily) {
+  btnWriteDaily.addEventListener('click', async () => {
+    if (!calibActive) { alert('Enable Calibration Mode first.'); return; }
+    const idx = parseInt(document.getElementById('daily-edit-idx').value);
+    const ts = parseInt(document.getElementById('daily-edit-ts').value) || 0;
+    const vol = Math.round(parseFloat(document.getElementById('daily-edit-vol').value) || 0);
+    const cum = Math.round(parseFloat(document.getElementById('daily-edit-cum').value) || 0);
+    const flags = parseInt(document.getElementById('daily-edit-flags').value) || 0;
+    
+    if (isNaN(idx) || idx < 0 || idx >= 31) { alert('Invalid index.'); return; }
+    
+    if (!confirm(`Update Daily Log Entry at index ${idx}?\nTimestamp: ${ts}\nVolume: ${vol} L\nCumulative: ${cum} L\nFlags: ${flags}`)) {
+      return;
+    }
+    
+    await send(`SET_DAILY_LOG=${idx},${ts},${vol},${cum},${flags}`);
+  });
+}
+
+const btnWriteMonthly = document.getElementById('btn-write-monthly-log');
+if (btnWriteMonthly) {
+  btnWriteMonthly.addEventListener('click', async () => {
+    if (!calibActive) { alert('Enable Calibration Mode first.'); return; }
+    const idx = parseInt(document.getElementById('monthly-edit-idx').value);
+    const ts = parseInt(document.getElementById('monthly-edit-ts').value) || 0;
+    const vol = Math.round(parseFloat(document.getElementById('monthly-edit-vol').value) || 0);
+    
+    if (isNaN(idx) || idx < 0 || idx >= 12) { alert('Invalid index.'); return; }
+    
+    if (!confirm(`Update Monthly Log Entry at index ${idx}?\nTimestamp: ${ts}\nVolume: ${vol} L`)) {
+      return;
+    }
+    
+    await send(`SET_MONTHLY_LOG=${idx},${ts},${vol}`);
+  });
+}
+
+window.updateLogsUI = function() {
+  const isConnected = connected;
+  const isCalib = connected && calibActive;
+
+  const dailyLock = document.getElementById('daily-logs-lock');
+  if (dailyLock) dailyLock.style.display = isCalib ? 'none' : (isConnected ? '' : 'none');
+
+  const monthlyLock = document.getElementById('monthly-logs-lock');
+  if (monthlyLock) monthlyLock.style.display = isCalib ? 'none' : (isConnected ? '' : 'none');
+
+  const readDailyBtn = document.getElementById('btn-read-daily-logs');
+  if (readDailyBtn) readDailyBtn.disabled = !isConnected;
+
+  const readMonthlyBtn = document.getElementById('btn-read-monthly-logs');
+  if (readMonthlyBtn) readMonthlyBtn.disabled = !isConnected;
+
+  const dailyInputs = [
+    'daily-edit-idx', 'daily-edit-date', 'daily-edit-ts', 
+    'daily-edit-vol', 'daily-edit-cum', 'daily-edit-flags', 'btn-write-daily-log'
+  ];
+  dailyInputs.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = !isCalib;
+  });
+
+  const monthlyInputs = [
+    'monthly-edit-idx', 'monthly-edit-date', 'monthly-edit-ts', 
+    'monthly-edit-vol', 'btn-write-monthly-log'
+  ];
+  monthlyInputs.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = !isCalib;
+  });
+};
 
 /* ─── Initial state ──────────────────────────────────────────────────────────*/
 enableControls(false);
