@@ -293,7 +293,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
       <div class="stat">
         <div class="s-lbl">RTC Time</div>
         <div class="s-val" style="font-size:12px;padding-top:6px;font-family:var(--mono)" id="d-time">—</div>
-        <div class="s-sub">IST</div>
+        <div class="s-sub">UTC</div>
       </div>
     </div>
     <div class="btn-row">
@@ -515,14 +515,6 @@ hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
     <p style="font-size:12px;color:var(--text-mute);margin-top:6px">
       BLE device name: <span id="s-name-preview" style="color:var(--text-dim)">RT_??001</span>
     </p>
-    <div class="field-row" style="margin-top:10px">
-      <label>BLE Device ID</label>
-      <input type="text" id="s-ble-id" readonly placeholder="Connect to populate">
-      <span class="unit"></span>
-    </div>
-    <p style="font-size:11px;color:var(--text-mute);margin-top:4px">
-      Browser-assigned ID (equals MAC address on Android/Chrome)
-    </p>
     <div class="btn-row">
       <button class="btn btn-ghost   btn-sm" id="s-get-cust" disabled>Get Code</button>
       <button class="btn btn-primary btn-sm" id="s-set-cust" disabled>Set Code</button>
@@ -628,6 +620,7 @@ let registeredFloors = new Set();   /* floor IDs currently registered on device 
 let cycleData = {};                 /* floor_id → {vol, flow, hops, method, miss} */
 let lastCycleEnd = false;
 let cycleActive = false;
+let floorsLoaded = false;           /* true after first successful LIST_FLOORS parse */
 
 /* ── Logging ── */
 const logBox = document.getElementById('log-box');
@@ -677,23 +670,37 @@ function onConnected() {
   document.getElementById('hdr-dev').textContent = '';
   document.getElementById('btn-connect').style.display = 'none';
   document.getElementById('btn-disconnect').style.display = '';
-  document.getElementById('s-ble-id').value = bleDevice.id || '—';
-  log('Connected to ' + name + ' [' + (bleDevice.id || '?') + ']', 'l-info');
+  log('Connected to ' + name, 'l-info');
   enableAll(true);
-  /* Auto-load status and floor list */
-  setTimeout(() => { send('STATUS'); send('LIST_FLOORS'); send('GET_TIME'); send('GET_CUST_CODE'); }, 300);
+  /*
+   * Auto-load only lightweight status commands.
+   *
+   * NOTE: LIST_FLOORS is NOT auto-called — it's an on-demand command the
+   * user triggers from the Floor Map tab (or via the "Refresh Status" btn).
+   * With 40 floors registered, LIST_FLOORS still produces a large response
+   * (though now compact single-line); we don't want to hit that on every
+   * connect since it briefly consumes BLE bandwidth.
+   *
+   * The 500 ms initial wait lets the chip settle after the connect event
+   * (notifications enabled + MTU exchange complete).
+   */
+  setTimeout(() => {
+    send('STATUS');
+    send('GET_TIME');
+    send('GET_CUST_CODE');
+  }, 500);
 }
 
 function onDisconnected() {
   connected = false;
   cycleActive = false;
+  floorsLoaded = false;   /* force fresh LIST_FLOORS next time user opens Floor Map */
   document.getElementById('conn-badge').textContent = 'Disconnected';
   document.getElementById('conn-badge').classList.remove('connected');
   document.getElementById('busy-badge').style.display = 'none';
   document.getElementById('btn-connect').style.display = '';
   document.getElementById('btn-disconnect').style.display = 'none';
   document.getElementById('hdr-dev').textContent = '';
-  document.getElementById('s-ble-id').value = '';
   enableAll(false);
   sppChar = null;
   resolvers.forEach(r => r.reject(new Error('disconnected')));
@@ -733,7 +740,28 @@ function dispatch(line) {
     return;
   }
 
-  /* FLOORS count=n: */
+  /* NEW compact format: "FLOORS=<count>:<id1>,<id2>,..." (single notification)
+   *   FLOORS=0:                        — no floors registered
+   *   FLOORS=3:1,5,12                  — three floors registered
+   *   FLOORS=40:1,2,3,...,40           — all forty */
+  const mFloorList = line.match(/^FLOORS=(\d+):(.*)$/);
+  if (mFloorList) {
+    const n = +mFloorList[1];
+    document.getElementById('d-floor-count').textContent = n;
+    registeredFloors.clear();
+    if (n > 0 && mFloorList[2].length > 0) {
+      for (const s of mFloorList[2].split(',')) {
+        const id = +s.trim();
+        if (id >= 1 && id <= 40) registeredFloors.add(id);
+      }
+    }
+    refreshFloorGrid();
+    floorsLoaded = true;
+    return;
+  }
+
+  /* LEGACY format (kept for firmware not yet updated):
+   *   "FLOORS count=n:"  followed by  "  [i] FLOOR=<id>" per floor */
   const mFloorCount = line.match(/^FLOORS\s+count=(\d+)/);
   if (mFloorCount) {
     const n = +mFloorCount[1];
@@ -741,16 +769,12 @@ function dispatch(line) {
     registeredFloors.clear();
     return;
   }
-
-  /* FLOORS: (none registered) */
   if (line.includes('(none registered)')) {
     registeredFloors.clear();
     document.getElementById('d-floor-count').textContent = '0';
     refreshFloorGrid();
     return;
   }
-
-  /*   [n] FLOOR=id */
   const mFloorEntry = line.match(/\[\d+\]\s+FLOOR=(\d+)/);
   if (mFloorEntry) {
     registeredFloors.add(+mFloorEntry[1]);
@@ -819,9 +843,10 @@ function dispatch(line) {
   /* TIME */
   const mTime = line.match(/(?:TIME unix=|OK TIME=)(\d+)/);
   if (mTime) {
-    const s = toIST(+mTime[1]);
-    document.getElementById('d-time').textContent = s;
-    document.getElementById('s-rtc').value = s;
+    const ts = +mTime[1];
+    const s = new Date(ts * 1000).toISOString().replace('T', ' ').slice(0, 19);
+    document.getElementById('d-time').textContent = s + ' UTC';
+    document.getElementById('s-rtc').value = s + ' UTC';
     return;
   }
 
@@ -871,25 +896,51 @@ function dispatch(line) {
   /* NET_TIME — time synced from network */
   const mNet = line.match(/^NET_TIME=(\d+)/);
   if (mNet) {
-    const s = toIST(+mNet[1]);
-    document.getElementById('d-time').textContent = s;
-    document.getElementById('s-rtc').value = s;
+    const s = new Date(+mNet[1] * 1000).toISOString().replace('T', ' ').slice(0, 19);
+    document.getElementById('d-time').textContent = s + ' UTC';
+    document.getElementById('s-rtc').value = s + ' UTC';
     return;
   }
 }
 
-/* ── Send ── */
-async function send(cmd) {
-  if (!sppChar) return;
-  log('→ ' + cmd, 'l-tx');
-  const data  = new TextEncoder().encode(cmd + '\n');
-  const CHUNK = 20;
-  try {
-    for (let i = 0; i < data.byteLength; i += CHUNK)
-      await sppChar.writeValueWithoutResponse(data.slice(i, i + CHUNK));
-  } catch (e) {
-    log('BLE write error: ' + e.message, 'l-err');
-  }
+/* ── Send (serialized global queue) ──
+ *
+ * All sends chain onto a single promise so at most one GATT write is in
+ * flight at a time.  Without this, calling send() three times in the same
+ * tick (e.g. auto-load STATUS/LIST_FLOORS/GET_TIME) throws "GATT operation
+ * already in progress" because Web Bluetooth's writeValueWithoutResponse is
+ * NOT re-entrant across separate calls.
+ *
+ * A small inter-command gap gives the chip time to send its notification
+ * response before the next command's write starts — especially important on
+ * commands with large multi-line responses (LIST_FLOORS on a 40-floor
+ * system produces 40+ notification packets).
+ */
+let sendChain = Promise.resolve();
+const SEND_GAP_MS   = 50;   /* min gap between two consecutive sends       */
+const HEAVY_GAP_MS  = 500;  /* extra gap after commands with big responses */
+const HEAVY_CMDS    = ['LIST_FLOORS', 'GET_DATA', 'LIST_VOL_PENDING'];
+
+function send(cmd) {
+  const prev = sendChain;
+  sendChain = (async () => {
+    try { await prev; } catch (_) { /* don't let failure break the chain */ }
+    if (!sppChar) return;
+    log('→ ' + cmd, 'l-tx');
+    const data  = new TextEncoder().encode(cmd + '\n');
+    const CHUNK = 20;
+    try {
+      for (let i = 0; i < data.byteLength; i += CHUNK) {
+        await sppChar.writeValueWithoutResponse(data.slice(i, i + CHUNK));
+      }
+    } catch (e) {
+      log('BLE write error: ' + e.message, 'l-err');
+    }
+    /* Inter-command gap — extra for heavy commands with big response bodies */
+    const heavy = HEAVY_CMDS.some(h => cmd.startsWith(h));
+    await new Promise(r => setTimeout(r, heavy ? HEAVY_GAP_MS : SEND_GAP_MS));
+  })();
+  return sendChain;
 }
 
 /* ── Floor Grid ── */
@@ -1029,6 +1080,12 @@ document.querySelectorAll('.tab').forEach(btn => {
     btn.classList.add('active');
     document.getElementById('pane-' + btn.dataset.tab).classList.add('active');
     if (btn.dataset.tab === 'cycle') document.getElementById('dot-cycle').classList.remove('show');
+    /* Lazy-load the floor list on first visit to Floor Map — LIST_FLOORS is
+     * intentionally NOT auto-called on connect (heavy on 40-floor systems),
+     * so we fetch it here once when the user needs it. */
+    if (btn.dataset.tab === 'floors' && connected && !floorsLoaded) {
+      send('LIST_FLOORS');
+    }
   });
 });
 
@@ -1168,16 +1225,6 @@ document.querySelectorAll('.qc').forEach(a => {
     document.querySelectorAll('.tab').forEach(b => { if (b.dataset.tab === 'terminal') b.click(); });
   });
 });
-
-/* ── IST formatter ── */
-function toIST(unixSec) {
-  return new Date(unixSec * 1000).toLocaleString('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    year: 'numeric', month: 'short', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-    hour12: false
-  }) + ' IST';
-}
 
 /* ── Init ── */
 enableAll(false);

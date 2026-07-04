@@ -337,6 +337,16 @@
         <div class="subval">minutes</div>
       </div>
       <div class="reading-box">
+        <div class="label">Water Temperature</div>
+        <div class="value" id="r-temp">—</div>
+        <div class="subval">°C (T1 RTD)</div>
+      </div>
+      <div class="reading-box">
+        <div class="label">Speed of Sound</div>
+        <div class="value" id="r-sos">—</div>
+        <div class="subval">m/s</div>
+      </div>
+      <div class="reading-box">
         <div class="label">Floor ID</div>
         <div class="value" id="r-floor-id">—</div>
         <div class="subval">Group <span id="r-group-id">—</span></div>
@@ -401,6 +411,14 @@
         <option value="0">Storage (SPP-only)</option>
       </select>
       <span class="unit"></span>
+
+      <label>Display Mode</label>
+      <select id="s-disp-mode">
+        <option value="0">Alternate (Volume / Flow every 5s)</option>
+        <option value="1">Volume only</option>
+        <option value="2">Flowrate only</option>
+      </select>
+      <span class="unit"></span>
     </div>
     <div class="btn-row">
       <button class="btn btn-primary" id="btn-read-status" disabled>Read Status</button>
@@ -410,6 +428,7 @@
       <button class="btn btn-success" id="btn-write-phy" disabled>Set PHY</button>
       <button class="btn btn-success" id="btn-write-tx" disabled>Set TX Power</button>
       <button class="btn btn-success" id="btn-write-mode" disabled>Set Mode</button>
+      <button class="btn btn-success" id="btn-write-disp-mode" disabled>Set Display Mode</button>
     </div>
   </div>
 
@@ -467,6 +486,58 @@
       <button class="btn btn-success" id="btn-write-length" disabled>Set Length</button>
       <button class="btn btn-success" id="btn-write-maxflow" disabled>Set Max Flow</button>
       <button class="btn btn-success" id="btn-write-minflow" disabled>Set Min Flow</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Temperature Sensor</h2>
+    <div class="form-grid">
+      <label>Sensor Installed</label>
+      <select id="t-sensor-installed">
+        <option value="1">Yes — use live T1 RTD reading</option>
+        <option value="0">No — use default temperature below</option>
+      </select>
+      <span class="unit"></span>
+
+      <label>Default Temperature</label>
+      <input type="number" id="t-default" step="0.1" min="0" max="100" placeholder="e.g. 25.0">
+      <span class="unit">°C</span>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-read-temp-cfg"      disabled>Read Temp Config</button>
+      <button class="btn btn-success" id="btn-write-temp-sensor"  disabled>Set Sensor Installed</button>
+      <button class="btn btn-success" id="btn-write-temp-default" disabled>Set Default Temp</button>
+    </div>
+
+    <div class="readings-grid" style="margin-top:14px">
+      <div class="reading-box">
+        <div class="label">Raw RTD Reading</div>
+        <div class="value" id="t-raw" style="font-size:20px">—</div>
+        <div class="subval">°C, uncalibrated</div>
+      </div>
+      <div class="reading-box">
+        <div class="label">Calibration Offset</div>
+        <div class="value" id="t-offset" style="font-size:20px">—</div>
+        <div class="subval">°C</div>
+      </div>
+      <div class="reading-box">
+        <div class="label">Effective Temperature</div>
+        <div class="value" id="t-effective" style="font-size:20px">—</div>
+        <div class="subval">used for flow calc</div>
+      </div>
+    </div>
+
+    <div class="warn-box" id="temp-calib-warn" style="display:none;margin-top:14px">
+      ⚠ Calibration mode is ON — place a reference thermometer at the meter, enter its reading below, and calibrate.
+    </div>
+    <div class="form-grid" style="margin-top:10px">
+      <label>Reference Temperature</label>
+      <input type="number" id="t-cal-ref" step="0.1" placeholder="e.g. 24.3 (from your reference bench/thermometer)">
+      <span class="unit">°C</span>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-warn"   id="btn-temp-calibrate" disabled>Calibrate</button>
+      <button class="btn btn-danger" id="btn-temp-clear-cal" disabled>Clear Calibration</button>
     </div>
   </div>
 </div>
@@ -559,11 +630,25 @@
 
   <!-- Daily Consumption History -->
   <div class="card">
-    <h2>Daily Consumption History (31 Days)</h2>
+    <h2>Daily Consumption History (1 Year / Partitioned by Month)</h2>
     <p style="color:var(--text-dim);font-size:13px;margin-bottom:14px">
-      Circular buffer of the last 31 daily water consumption logs. Reading is manual on-demand to prevent BLE communication overload.
+      Circular buffer of 31 daily water consumption logs per calendar month. Select a month to read.
     </p>
-    <div class="btn-row" style="margin-top:0; margin-bottom:12px;">
+    <div class="btn-row" style="margin-top:0; margin-bottom:12px; display:flex; gap:8px; align-items:center;">
+      <select id="daily-read-month" style="width:140px; display:inline-block; padding: 6px 10px; border-radius: 6px; background: var(--input-bg); border: 1px solid var(--border); color: var(--text);">
+        <option value="0">January</option>
+        <option value="1">February</option>
+        <option value="2">March</option>
+        <option value="3">April</option>
+        <option value="4">May</option>
+        <option value="5">June</option>
+        <option value="6">July</option>
+        <option value="7">August</option>
+        <option value="8">September</option>
+        <option value="9">October</option>
+        <option value="10">November</option>
+        <option value="11">December</option>
+      </select>
       <button class="btn btn-primary" id="btn-read-daily-logs" disabled>Read Daily Logs</button>
       <span id="daily-read-progress" style="color:var(--text-dim);font-size:12px;align-self:center;margin-left:8px;"></span>
     </div>
@@ -1197,6 +1282,7 @@ let dailyLogsCache = Array(31).fill(null);
 let monthlyLogsCache = Array(12).fill(null);
 let dailyLogsReadCount = 0;
 let monthlyLogsReadCount = 0;
+let dailyLogsSelectedMonth = new Date().getMonth();
 
 /* ── Build calibration table HTML rows ── */
 (function buildTable() {
@@ -1347,19 +1433,22 @@ function dispatchLine(line) {
   }
 
   /* Confirmation lines */
-  const mDailyUpd = line.match(/^OK DAILY_LOG\[(\d+)\] UPDATED$/);
+  const mDailyUpd = line.match(/^OK DAILY_LOG\[(\d+)\]\[(\d+)\] UPDATED$/);
   if (mDailyUpd) {
-    const idx = parseInt(mDailyUpd[1]);
-    log(`Daily Log [${idx}] successfully updated on device.`, 'log-info');
-    const formIdx = parseInt(document.getElementById('daily-edit-idx').value);
-    if (formIdx === idx) {
-      dailyLogsCache[idx] = {
-        timestamp: parseInt(document.getElementById('daily-edit-ts').value) || 0,
-        vol: Math.round(parseFloat(document.getElementById('daily-edit-vol').value) || 0),
-        cum: Math.round(parseFloat(document.getElementById('daily-edit-cum').value) || 0),
-        flags: parseInt(document.getElementById('daily-edit-flags').value) || 0
-      };
-      renderDailyLogsTable();
+    const month = parseInt(mDailyUpd[1]);
+    const idx = parseInt(mDailyUpd[2]);
+    log(`Daily Log [Month ${month}][Day ${idx}] successfully updated on device.`, 'log-info');
+    if (dailyLogsSelectedMonth === month) {
+      const formIdx = parseInt(document.getElementById('daily-edit-idx').value);
+      if (formIdx === idx) {
+        dailyLogsCache[idx] = {
+          timestamp: parseInt(document.getElementById('daily-edit-ts').value) || 0,
+          vol: Math.round(parseFloat(document.getElementById('daily-edit-vol').value) || 0),
+          cum: Math.round(parseFloat(document.getElementById('daily-edit-cum').value) || 0),
+          flags: parseInt(document.getElementById('daily-edit-flags').value) || 0
+        };
+        renderDailyLogsTable();
+      }
     }
     return;
   }
@@ -1380,13 +1469,17 @@ function dispatchLine(line) {
   }
 
   /* Meter All */
-  const mAll = line.match(/VOL=(\S+)\s+FLOW=(\S+)\s+FWD=(\S+)\s+BWD=(\S+)\s+PUMP=(\S+)/);
+  const mAll = line.match(/VOL=(\S+)\s+FLOW=(\S+)\s+FWD=(\S+)\s+BWD=(\S+)\s+PUMP=(\S+)\s+TEMP=(\S+)\s+SOS=(\S+)/);
   if (mAll) {
     document.getElementById('r-vol').textContent  = mAll[1];
     document.getElementById('r-flow').textContent = mAll[2];
     document.getElementById('r-fwd').textContent  = mAll[3];
     document.getElementById('r-bwd').textContent  = mAll[4];
     document.getElementById('r-pump').textContent = mAll[5];
+    const tempVal = parseFloat(mAll[6]);
+    /* Firmware reports -999 when no valid RTD reading exists yet */
+    document.getElementById('r-temp').textContent = (tempVal <= -900) ? 'N/A' : mAll[6];
+    document.getElementById('r-sos').textContent   = (tempVal <= -900) ? '—'   : mAll[7];
     document.getElementById('last-read').textContent = 'Updated ' + new Date().toLocaleTimeString();
     return;
   }
@@ -1415,6 +1508,8 @@ function dispatchLine(line) {
     document.getElementById('s-tx-power').value   = mFloor[5];
     const mMode = line.match(/MODE=(\d+)/);
     if (mMode) document.getElementById('s-mode').value = mMode[1];
+    const mDispMode = line.match(/DISP_MODE=(\d+)/);
+    if (mDispMode) document.getElementById('s-disp-mode').value = mDispMode[1];
     return;
   }
   /* Config line */
@@ -1425,6 +1520,16 @@ function dispatchLine(line) {
     document.getElementById('c-length').value  = mCfg[3];
     document.getElementById('c-maxflow').value = mCfg[4];
     document.getElementById('c-minflow').value = mCfg[5];
+    return;
+  }
+  /* Temperature sensor config */
+  const mTempCfg = line.match(/TEMP_SENSOR_INSTALLED=(\d)\s+TEMP_DEFAULT=(\S+)\s+TEMP_CAL_OFFSET=(\S+)\s+TEMP_RAW=(\S+)\s+TEMP_EFFECTIVE=(\S+)/);
+  if (mTempCfg) {
+    document.getElementById('t-sensor-installed').value = mTempCfg[1];
+    document.getElementById('t-default').value          = mTempCfg[2];
+    document.getElementById('t-raw').textContent         = mTempCfg[4];
+    document.getElementById('t-offset').textContent      = mTempCfg[3];
+    document.getElementById('t-effective').textContent   = mTempCfg[5];
     return;
   }
   /* Calibration table row: TABLE[n]=flow,gain */
@@ -1784,9 +1889,10 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 const ACTION_BTNS = [
   'btn-read-meter','btn-auto-refresh','btn-read-status',
   'btn-write-floor-id','btn-write-group-id','btn-write-interval',
-  'btn-write-phy','btn-write-tx','btn-write-mode',
+  'btn-write-phy','btn-write-tx','btn-write-mode','btn-write-disp-mode',
   'btn-get-time','btn-set-time','btn-reset-device',
   'btn-read-cfg',
+  'btn-read-temp-cfg','btn-write-temp-sensor','btn-write-temp-default',
   'btn-calib-unlock','btn-calib-lock',
   'btn-read-table','btn-write-table-all',
   'btn-read-vol','btn-write-vol',
@@ -1805,7 +1911,8 @@ function enableControls(on) {
   if (!on) {
     /* calib write buttons always off when disconnected */
     ['btn-write-sos','btn-write-radius','btn-write-length',
-     'btn-write-maxflow','btn-write-minflow'].forEach(id => {
+     'btn-write-maxflow','btn-write-minflow',
+     'btn-temp-calibrate','btn-temp-clear-cal'].forEach(id => {
       const el = document.getElementById(id); if (el) el.disabled = true;
     });
     for (let r = 0; r < 20; r++) {
@@ -1823,7 +1930,8 @@ function enableControls(on) {
 function updateCalibWriteButtons() {
   const on = connected && calibActive;
   ['btn-write-sos','btn-write-radius','btn-write-length',
-   'btn-write-maxflow','btn-write-minflow'].forEach(id => {
+   'btn-write-maxflow','btn-write-minflow',
+   'btn-temp-calibrate','btn-temp-clear-cal'].forEach(id => {
     const el = document.getElementById(id); if (el) el.disabled = !on;
   });
   for (let r = 0; r < 20; r++) {
@@ -1839,6 +1947,8 @@ function updateCalibUI() {
   document.getElementById('calib-on-panel').style.display  = calibActive ? '' : 'none';
   const warn = document.getElementById('cfg-calib-warn');
   if (warn) warn.style.display = calibActive ? '' : 'none';
+  const tempWarn = document.getElementById('temp-calib-warn');
+  if (tempWarn) tempWarn.style.display = calibActive ? '' : 'none';
   const notice = document.getElementById('table-lock-notice');
   if (notice) notice.style.display = (!calibActive && connected) ? '' : 'none';
   updateCalibWriteButtons();
@@ -1912,6 +2022,11 @@ document.getElementById('btn-write-mode').addEventListener('click', async () => 
   await send(`SET_MODE=${v}`);
 });
 
+document.getElementById('btn-write-disp-mode').addEventListener('click', async () => {
+  const v = document.getElementById('s-disp-mode').value;
+  await send(`SET_DISP_MODE=${v}`);
+});
+
 /* ─── IST formatter ─────────────────────────────────────────────────────────*/
 function toIST(unixSec) {
   return new Date(unixSec * 1000).toLocaleString('en-IN', {
@@ -1949,6 +2064,26 @@ document.getElementById('btn-write-maxflow').addEventListener('click', () => {
 });
 document.getElementById('btn-write-minflow').addEventListener('click', () => {
   const v = document.getElementById('c-minflow').value; if (v) send(`SET_MIN_FLOW=${v}`);
+});
+
+/* ─── Temperature sensor ────────────────────────────────────────────────────*/
+document.getElementById('btn-read-temp-cfg').addEventListener('click', () => send('GET_TEMP_CFG'));
+document.getElementById('btn-write-temp-sensor').addEventListener('click', () => {
+  const v = document.getElementById('t-sensor-installed').value;
+  send(`SET_TEMP_SENSOR=${v}`);
+});
+document.getElementById('btn-write-temp-default').addEventListener('click', () => {
+  const v = document.getElementById('t-default').value; if (v) send(`SET_TEMP_DEFAULT=${v}`);
+});
+document.getElementById('btn-temp-calibrate').addEventListener('click', () => {
+  const v = document.getElementById('t-cal-ref').value;
+  if (!v) return;
+  if (!confirm(`Calibrate using reference temperature ${v} °C? This overwrites the current offset.`)) return;
+  send(`SET_TEMP_CAL=${v}`);
+});
+document.getElementById('btn-temp-clear-cal').addEventListener('click', () => {
+  if (!confirm('Clear the temperature calibration offset?')) return;
+  send('CLEAR_TEMP_CAL');
 });
 
 /* ─── Calibration mode ───────────────────────────────────────────────────────*/
@@ -2776,12 +2911,17 @@ if (monthlyDateEl) {
 const btnReadDaily = document.getElementById('btn-read-daily-logs');
 if (btnReadDaily) {
   btnReadDaily.addEventListener('click', async () => {
+    const monthEl = document.getElementById('daily-read-month');
+    if (monthEl) {
+      dailyLogsSelectedMonth = parseInt(monthEl.value);
+      if (isNaN(dailyLogsSelectedMonth)) dailyLogsSelectedMonth = new Date().getMonth();
+    }
     dailyLogsCache.fill(null);
     dailyLogsReadCount = 0;
     const el = document.getElementById('daily-read-progress');
     if (el) el.textContent = 'Requesting logs...';
     renderDailyLogsTable();
-    await send('GET_DAILY_LOGS');
+    await send(`GET_DAILY_LOGS=${dailyLogsSelectedMonth}`);
   });
 }
 
@@ -2809,11 +2949,12 @@ if (btnWriteDaily) {
     
     if (isNaN(idx) || idx < 0 || idx >= 31) { alert('Invalid index.'); return; }
     
-    if (!confirm(`Update Daily Log Entry at index ${idx}?\nTimestamp: ${ts}\nVolume: ${vol} L\nCumulative: ${cum} L\nFlags: ${flags}`)) {
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    if (!confirm(`Update Daily Log Entry at Month: ${monthNames[dailyLogsSelectedMonth]} (Idx ${dailyLogsSelectedMonth}), Day slot ${idx}?\nTimestamp: ${ts}\nVolume: ${vol} L\nCumulative: ${cum} L\nFlags: ${flags}`)) {
       return;
     }
     
-    await send(`SET_DAILY_LOG=${idx},${ts},${vol},${cum},${flags}`);
+    await send(`SET_DAILY_LOG=${dailyLogsSelectedMonth},${idx},${ts},${vol},${cum},${flags}`);
   });
 }
 
@@ -2873,6 +3014,8 @@ window.updateLogsUI = function() {
 /* ─── Initial state ──────────────────────────────────────────────────────────*/
 enableControls(false);
 updateCalibUI();
+const selectMonthEl = document.getElementById('daily-read-month');
+if (selectMonthEl) selectMonthEl.value = dailyLogsSelectedMonth;
 log('MIRA MESH Configurator loaded. Click "Connect" to begin.', 'log-info');
 </script>
 </body>
